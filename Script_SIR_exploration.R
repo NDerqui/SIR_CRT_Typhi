@@ -418,12 +418,12 @@ p_vax <- 0.5   # Vaccination coverage - THIS WE WILL EXPLORE
 vax_eff <- 0.8     # Vaccine effect in infection reduction - CHECK
 
 # Infected observed
-# 
-# p_sym <- 0.55       # Probability of being symptomatic - CHECK
-# p_test <- 0.75      # Probability of seeking a test - CHECK
-# p_positive <- 0.85  # Probability of test being positive
-# 
-# mu <- p_sym*p_test*p_positive
+
+p_sym <- 0.55       # Probability of being symptomatic - CHECK
+p_test <- 0.50      # Probability of seeking a test - CHECK
+p_positive <- 0.80  # Probability of test being positive
+
+mu <- p_sym*p_test*p_positive
 
 
 #### 1D: Time ####
@@ -478,13 +478,18 @@ N <- 200000                          # Total population in the study: FIXED
 C <- 100                              # Number of clusters
 cluster_no <- seq(1:C)                # Vector of clusters
 
-                                      # Population in each cluster: normal distribution
+                                                            # Population in each cluster: normal distribution
 n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  #  with mean total people/number clusters
-cluster_n <- abs(n)                        # Vector of cluster populations
+cluster_n <- abs(n)                                         # Vector of cluster populations
 
-
-V <- C/2                              # Number of clusters in the vaccine group
+V <- C/2                                                   # Number of clusters in the vaccine group
 cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+
+# Data frame for reference
+
+cluster_data <- data.frame(cluster = cluster_no,
+                           vaccine = cluster_vstatus,
+                           pop = cluster_n)
 
 
 #### Array ####
@@ -578,40 +583,105 @@ for (j in 1:C) {
   }
 }
 
+
+#### Results: all ####
+
 # Store results
 
-sir_result <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
-colnames(sir_result) <- names_matrix
+sir_res_infected <- as.data.frame(matrix(0, # Empty matrix
+                                         nrow = length(time_seq), ncol = C))
+colnames(sir_res_infected) <- names_matrix
 
 for (i in 1:C) {
-  sir_result[,i] <- sir[,7,i]
+  sir_res_infected[,i] <- sir[,7,i]         # Get results from run
 }
 
-# Simple graph!
+sir_res_observed <- as.data.frame(matrix(0, # Empty matrix
+                                         nrow = length(time_seq), ncol = C))
+colnames(sir_res_observed) <- names_matrix
 
-sir_result <- sir_result %>%
+for (i in 1:C) {
+  sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0) # Results from run x prob of detecting that infected
+}
+
+# Pivot the results and merge all together (infected and observed)
+
+sir_res_infected <- sir_res_infected %>%
   mutate(time_seq = time_seq) %>%
   pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
-  mutate(num_cluster = readr::parse_number(cluster)) %>%
-  arrange(num_cluster)
+  mutate(cluster = readr::parse_number(cluster)) %>%
+  arrange(cluster) %>%
+  merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+  select(c("cluster", "vaccine", "time_seq", "infected"))
+
+sir_res_observed <- sir_res_observed %>%
+  mutate(time_seq = time_seq) %>%
+  pivot_longer(-time_seq, names_to = "cluster", values_to = "observed") %>%
+  mutate(cluster = readr::parse_number(cluster)) %>%
+  arrange(cluster) %>%
+  merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+  select(c("cluster", "vaccine", "time_seq", "observed"))
+
+sir_result <- merge(sir_res_infected, sir_res_observed,
+                    by = c("cluster", "vaccine", "time_seq"), all = TRUE)
+sir_result <- arrange(sir_result, cluster, time_seq)
+
+# Simple graph (mainly to check if model was OK)
 
 ggplot() +
-  geom_line(data = sir_result[1:36500,],
-            mapping = aes(x = time_seq, y = infected, group = num_cluster),
-            color = "steelblue") +
-  geom_line(data = sir_result[36501:73000,],
-            mapping = aes(x = time_seq, y = infected, group = num_cluster),
-            color = "firebrick") +
+  geom_line(data = filter(sir_result, vaccine == 1),
+            mapping = aes(x = time_seq, y = infected, group = cluster,
+            color = "Inf_Vax")) +
+  geom_line(data = filter(sir_result, vaccine == 0),
+            mapping = aes(x = time_seq, y = infected, group = cluster,
+            color = "Inf_No")) +
+  geom_line(data = filter(sir_result, vaccine == 1),
+            mapping = aes(x = time_seq, y = observed, group = cluster,
+            color = "Obs_Vax")) +
+  geom_line(data = filter(sir_result, vaccine == 0),
+            mapping = aes(x = time_seq, y = observed, group = cluster,
+            color = "Obs_No")) +
+  scale_color_manual(name = NULL,
+                     breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
+                     values = c("Inf_Vax" = "steelblue4",
+                                "Inf_No" = "steelblue1",
+                                "Obs_Vax" = "palegreen4",
+                                "Obs_No" = "palegreen1"),
+                     labels = c("Infections in vaccine clusters",
+                                "Infections in non-vaccine clusters",
+                                "Detected infections in vaccine clusters",
+                                "Detected infections in non-vaccine cluster")) +
   xlim(c(1, 150)) +
   theme_classic() +
   labs(title = "Incidence over time",
        x = "Time over two years (days)",
-       y = "Number of infections") +
+       y = "Number of infections/detected infections") +
   theme(
-    plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
-    axis.title.x = element_text(size = rel(1.1), face="bold"),
-    axis.title.y = element_text(size = rel(1.1), face="bold"),
-    axis.text = element_text(size=rel(1)))
+      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
+      axis.title.x = element_text(size = rel(1.1), face="bold"),
+      axis.title.y = element_text(size = rel(1.1), face="bold"),
+      axis.text = element_text(size=rel(1)),
+      legend.position = "bottom",
+      legend.text = element_text(size=rel(1)))
 
 
+#### Results: summary ####
 
+# Get summary stats
+
+sir_summary <- sir_result %>%
+  group_by(cluster) %>%
+  mutate(mean_inf = mean(infected)) %>%
+  mutate(mena_obs = mean(observed)) %>%
+  mutate(sum_inf = sum(infected)) %>%
+  mutate(sum_obs = sum(observed)) %>%
+  filter(row_number() == 1) %>%
+  select(-time_seq, -infected, -observed) %>%
+  ungroup()
+
+# Test
+
+model <- glm(formula = sum_obs ~ vaccine,
+             family = "poisson", data = sir_summary)
+x <- exp(summary(model)$coef)
+y <- exp(confint(model))
