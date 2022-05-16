@@ -2,7 +2,7 @@
 ## Cluster Randomised Trial for a Typhoid vaccine in Vellore ##
     ## MRes Biomedical Research - EECID - Project 2 ##
 
-                ## SIR Model ##
+                ## SIR Model Exploration ##
 
 
 
