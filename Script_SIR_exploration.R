@@ -900,7 +900,16 @@ for (j in 1:C) {
   for (i in 2:length(time_seq)) {
     
     # Hazards
-    sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j] 
+    sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
+    
+    for (k in 1:C) { # Loop to add external FOI
+      
+      if (k != j) {
+        sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k]
+      }
+      
+    }
+    
     sir[i, 10, j] = 1/dur_inf
     
     # Probabilities
@@ -972,16 +981,16 @@ sir_result <- arrange(sir_result, cluster, time_seq)
 ggplot() +
   geom_line(data = filter(sir_result, vaccine == 1),
             mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_Vax")) +
+                          color = "Inf_Vax"), size = rel(1.1)) +
   geom_line(data = filter(sir_result, vaccine == 0),
             mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_No")) +
+                          color = "Inf_No"), size = rel(1.1)) +
   geom_line(data = filter(sir_result, vaccine == 1),
             mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_Vax")) +
+                          color = "Obs_Vax"), size = rel(1.1)) +
   geom_line(data = filter(sir_result, vaccine == 0),
             mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_No")) +
+                          color = "Obs_No"), size = rel(1.1)) +
   scale_color_manual(name = NULL,
                      breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
                      values = c("Inf_Vax" = "steelblue4",
