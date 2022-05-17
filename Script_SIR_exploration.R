@@ -1035,3 +1035,38 @@ model <- glm(formula = sum_obs ~ vaccine,
              family = "poisson", data = sir_summary)
 x <- exp(summary(model)$coef)
 y <- exp(confint(model))
+
+
+#### Cluster network ####
+
+library(ggraph)
+library(tidygraph)
+
+# Create objects for the nodes and edges (connections between nodes)
+
+nodes <- cluster_no %>%
+  as.data.frame() %>%
+  setNames("id") %>%
+  mutate(label = paste0("Cluster ", cluster_no))
+
+edges <- cluster_data %>%
+  select(-vaccine, -pop) %>%
+  setNames(c("from", cluster_no)) %>%
+  pivot_longer(-from, names_to = "to", values_to = "distance") %>%
+  mutate(weight = 1/distance) %>%
+  mutate(to = as.integer(to)) %>%
+  select(from, to, weight)
+  
+# Create a network object
+
+routes_tidy <- tbl_graph(nodes = nodes, edges = edges)
+routes_tidy
+
+# Graph to visualize the network
+
+ggraph(routes_tidy, layout = "graphopt") +
+  geom_node_text(aes(label = label), repel = TRUE) +
+  geom_edge_link(aes(width = weight), alpha = 0.1) +
+  labs(edge_width = "Distance") +
+  theme_graph()
+  
