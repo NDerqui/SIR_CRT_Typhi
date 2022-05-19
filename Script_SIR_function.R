@@ -11,7 +11,6 @@
 rm(list = ls())
 
 library(tidyverse)
-library(ggplot2)
 
 
 
@@ -31,7 +30,7 @@ n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluste
 cluster_n <- abs(n)                                         # Vector of cluster populations
 
 
-#### Cluster ####
+#### Clusters ####
 
 # Distance matrix across clusters (should be the same across runs)
 
@@ -201,7 +200,7 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   # S and V population - depends on vaccination cluster status and coverage
   for (i in 1:C) {
     
-    if (sir[, 2, i] == 1) {                                                  # In vaccinated clusters
+    if (sir[1, 2, i] == 1) {                                                 # In vaccinated clusters
       sir[, 5, i] = round((sir[, 4 ,i]-sir[, 7, i])*(1 - p_vax), digits = 0) # Susceptible (non-vax)
       sir[, 6, i] = round((sir[, 4 ,i]-sir[, 7, i])*p_vax, digits = 0)       # Vaccinated
       
@@ -298,93 +297,13 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
 }
 
 
-cluster_reference <- function(N, C, cluster_n, cluster_dis, p_clusvax) {
-  
-  # Cluster vectors
-  
-  cluster_no <- seq(1:C)                
-  
-  cluster_n <- cluster_n                                      
-  
-  V <- C*p_clusvax                                           
-  cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) 
-  
-  # Data frame for reference
-  
-  cluster_data <- data.frame(cluster = cluster_no,
-                             vaccine = cluster_vstatus,
-                             pop = cluster_n,
-                             cluster_dis)
-  colnames(cluster_data) <- c("cluster", "vaccine", "pop",
-                              paste0("dis_", cluster_no))
-  
-  cluster_data
-  
-}
-
-
-
-# SAMPLE RUNS -------------------------------------------------------------
-
-
-sir_1 <- sir_model(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
-                   number_infected = number_infected,
-                   R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
-                   p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
-                   p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-                   time_step = time_step, years = years)
-
-cluster_1 <- cluster_reference(N = N, C = C, cluster_n = cluster_n,
-                               cluster_dis = cluster_dis, p_clusvax = p_clusvax)
-
-
-#### Graph ####
-
-ggplot() +
-  geom_line(data = filter(sir_1, vaccine == 1),
-            mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_Vax"), size = rel(1.1)) +
-  geom_line(data = filter(sir_1, vaccine == 0),
-            mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_No"), size = rel(1.1)) +
-  geom_line(data = filter(sir_1, vaccine == 1),
-            mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_Vax"), size = rel(1.1)) +
-  geom_line(data = filter(sir_1, vaccine == 0),
-            mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_No"), size = rel(1.1)) +
-  scale_color_manual(name = NULL,
-                     breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
-                     values = c("Inf_Vax" = "steelblue4",
-                                "Inf_No" = "steelblue1",
-                                "Obs_Vax" = "palegreen4",
-                                "Obs_No" = "palegreen1"),
-                     labels = c("Infections in vaccine clusters",
-                                "Infections in non-vaccine clusters",
-                                "Detected infections in vaccine clusters",
-                                "Detected infections in non-vaccine cluster")) +
-  xlim(c(1, 150)) +
-  theme_classic() +
-  labs(title = "Incidence over time",
-       x = "Time (days)",
-       y = "Number of infections/detected infections") +
-  theme(
-    plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
-    axis.title.x = element_text(size = rel(1.1), face="bold"),
-    axis.title.y = element_text(size = rel(1.1), face="bold"),
-    axis.text = element_text(size=rel(1)),
-    legend.position = "bottom",
-    legend.text = element_text(size=rel(1)))
-
-
 
 # SEVERAL RUNS ------------------------------------------------------------
 
 
 # Function to run the SIR several times
 
-dim(sir_1)
-# One run generates a matrix of 36500 rows (time_points x clusters)
+# One run generates a matrix of time_points x clusters rows
 # and five cols (cluster, vaccine, time_seq, infected and observed)
 
 # To store the results of run we would need an array
@@ -392,26 +311,135 @@ dim(sir_1)
 
 sir_many <- function(..., n_runs) {
   
-  time_seq <- seq(from = 1, to = 365*years, by = time_step)
+  sir_result <- sir_model(...)
   
-  names_row <- seq(1:(length(time_seq)*C))
+  sir_result <- sir_result %>%
+    mutate(run = 1)
   
-  names_column <- c("cluster", "vaccine", "time_seq", "infected", "observed")
+  sir_output <- sir_result
   
-  names_matrix <- paste0("run_", seq(1:n_runs))
-  
-  output <- array(0, dim = c(length(time_seq)*C, 5, n_runs),
-               dimnames = list(names_row, names_column, names_matrix))
-  
-  for (i in 1:n_runs) {
+  for (i in 2:n_runs) {
     
     sir_result <- sir_model(...)
     
-    output[ , , i] <- as.matrix(sir_result)
+    sir_result <- sir_result %>%
+      mutate(run = i)
+    
+    sir_output <- merge(sir_output, sir_result,
+                        by = c("cluster", "vaccine", "time_seq",
+                               "infected", "observed", "run"), all = TRUE)
+    
   }
+  
+  sir_output <- sir_output %>%
+    select("run", "cluster", "vaccine", "time_seq", "infected", "observed") %>%
+    arrange(run, cluster, time_seq)
+  
+  sir_output
+}
+
+
+#### Results function ####
+
+
+# Graph
+
+sir_graph <- function(sir_many_result) {
+  
+  ggplot() +
+    geom_line(data = filter(sir_many_result, vaccine == 1),
+              mapping = aes(x = time_seq, y = infected, group = run,
+                            color = "Inf_Vax")) +
+    geom_line(data = filter(sir_many_result, vaccine == 0),
+              mapping = aes(x = time_seq, y = infected, group = run,
+                            color = "Inf_No")) +
+    geom_line(data = filter(sir_many_result, vaccine == 1),
+              mapping = aes(x = time_seq, y = observed, group = run,
+                            color = "Obs_Vax")) +
+    geom_line(data = filter(sir_many_result, vaccine == 0),
+              mapping = aes(x = time_seq, y = observed, group = run,
+                            color = "Obs_No")) +
+    scale_color_manual(name = NULL,
+                       breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
+                       values = c("Inf_Vax" = "steelblue4",
+                                  "Inf_No" = "steelblue1",
+                                  "Obs_Vax" = "palegreen4",
+                                  "Obs_No" = "palegreen1"),
+                       labels = c("Infections in vaccine clusters",
+                                  "Infections in non-vaccine clusters",
+                                  "Detected infections in vaccine clusters",
+                                  "Detected infections in non-vaccine cluster")) +
+    xlim(c(1, 100)) +
+    theme_classic() +
+    labs(title = "Incidence over time",
+         x = "Time (days)",
+         y = "Number of infections/detected infections") +
+    theme(
+      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
+      axis.title.x = element_text(size = rel(1.1), face="bold"),
+      axis.title.y = element_text(size = rel(1.1), face="bold"),
+      axis.text = element_text(size=rel(1)),
+      legend.position = "bottom",
+      legend.text = element_text(size=rel(1))) +
+    facet_wrap(~cluster, ncol = 10, nrow = 10)
+  
+}
+
+
+# Summary numbers
+
+sir_summary <- function(sir_many_result, n_runs) {
+  
+  summary <- sir_many_result %>%
+    group_by(run, cluster) %>%
+    mutate(mean_inf = mean(infected)) %>%
+    mutate(mena_obs = mean(observed)) %>%
+    mutate(sum_inf = sum(infected)) %>%
+    mutate(sum_obs = sum(observed)) %>%
+    filter(row_number() == 1) %>%
+    select(-time_seq, -infected, -observed) %>%
+    ungroup()
+  
+}
+
+
+# Poisson regression
+
+sir_stats <- function(sir_summary_result, n_runs) {
+  
+  output <- matrix(0, ncol = 6, nrow = n_runs)
+  
+  for (i in 1:n_runs) {
+    
+    model <- glm(formula = sum_obs ~ vaccine,
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    x <- exp(summary(model)$coef)
+    
+    y <- exp(confint(model))
+    
+    output[i, 1:4] <- x[2,]
+    
+    output[i, 5:6] <- y[2,]
+  }
+  
+  rownames(output) <- paste0("run_1", seq(1:10))
+  
+  colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
+                        "2.5%", "97.5%")
   
   output
 }
+
+
+# SAMPLE RUNS -------------------------------------------------------------
+
+
+# How many simulations?
+
+n_runs <- 10
+
+# Run!
 
 test <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
                  number_infected = number_infected,
@@ -419,30 +447,14 @@ test <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
                  p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
                  p_sym = p_sym, p_test = p_test, p_positive = p_positive,
                  time_step = time_step, years = years,
-                 n_runs = 10)
+                 n_runs = n_runs)
 
+# Graph
 
-
-
-
-#### Summary ####
+p <- sir_graph(test)
 
 # Get summary stats
 
-sir_summary <- sir_1 %>%
-  group_by(cluster) %>%
-  mutate(mean_inf = mean(infected)) %>%
-  mutate(mena_obs = mean(observed)) %>%
-  mutate(sum_inf = sum(infected)) %>%
-  mutate(sum_obs = sum(observed)) %>%
-  filter(row_number() == 1) %>%
-  select(-time_seq, -infected, -observed) %>%
-  ungroup()
+summary <- sir_summary(test, n_runs)
 
-# Test
-
-model <- glm(formula = sum_obs ~ vaccine,
-             family = "poisson", data = sir_summary)
-x <- exp(summary(model)$coef)
-y <- exp(confint(model))
-
+stats <- sir_stats(summary, n_runs)
