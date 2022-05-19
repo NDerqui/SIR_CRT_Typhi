@@ -18,48 +18,79 @@ library(ggplot2)
 # PARAMETERS --------------------------------------------------------------
 
 
-# Basic: total population and number of clusters
+#### Basic ####
+
+# Total population and number of clusters
 
 N <- 200000                       # Total population in the study
 C <- 100                          # Number of clusters
 
+# The population in each cluster should be the same across runs
 
-# Prevalence of disease: starting seed
+n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
+cluster_n <- abs(n)                                         # Vector of cluster populations
+
+
+#### Cluster ####
+
+# Distance matrix across clusters (should be the same across runs)
+
+cluster_dis <- matrix(1, nrow = C, ncol = C,                   # Matrix with distance between each pair of clusters
+                      dimnames = list(seq(1:C), seq(1:C)))
+
+cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- runif(    # Filled with random numbers in a symmetrical way
+  n = (C^2 - C)/2, min = 1, max = 100)
+cluster_dis[upper.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[upper.tri(cluster_dis)]
+cluster_dis <- round(cluster_dis, digits = 1)
+
+
+#### Prevalence ####
+
+# Starting seed of epidemic
 
 number_infected <- as.integer(10) # Number of initially infected in the cluster
 
 
-# Force of infection (infections/time): beta = R0/Duration of infectiousness
+#### Force of infection ####
+
+# (infections/time): beta = R0/Duration of infectiousness
 
 R0 <- 2            # Basic reproduction number
 dur_inf <- 3       # Duration of infectiousness (days)
 
+# Importation rate: from external clusters to a given one
 
-# Vaccination coverage and effect
+imp_rate <- 0.25
+
+
+#### Vaccination ####
+
+# coverage and effect
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
 vax_eff <- 0.8     # Vaccine effectiveness (infection)
 
 
-# Detected infections
+#### Detected infections ####
 
 p_sym <- 0.55       # Probability of being symptomatic - CHECK
 p_test <- 0.50      # Probability of seeking a test - CHECK
 p_positive <- 0.80  # Probability of test being positive
 
 
-# Time frame
+#### Time frame ####
 
 time_step <- 1      # Time step change (days)
-years <- 1          # Total duration of simulaiton (years)
+years <- 1          # Total duration of simulation (years)
 
 
 
 # FUNCTION ----------------------------------------------------------------
 
 
-sir_model <- function(N, C, number_infected, R0, dur_inf,
+sir_model <- function(N, C, cluster_n, cluster_dis,
+                      number_infected, R0, dur_inf, imp_rate,
                       p_vax, p_clusvax, vax_eff, p_sym, p_test, p_positive,
                       time_step, years) {
 
@@ -76,10 +107,9 @@ sir_model <- function(N, C, number_infected, R0, dur_inf,
   
   # Cluster vectors
 
-  cluster_no <- seq(1:C)                # Vector of clusters
+  cluster_no <- seq(1:C)                                      # Vector of clusters
   
-  n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
-  cluster_n <- abs(n)                                         # Vector of cluster populations
+  cluster_n <- cluster_n                                      # Vector of cluster populations
   
   V <- C*p_clusvax                                           # Number of clusters in the vaccine group
   cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
@@ -88,7 +118,10 @@ sir_model <- function(N, C, number_infected, R0, dur_inf,
   
   cluster_data <- data.frame(cluster = cluster_no,
                              vaccine = cluster_vstatus,
-                             pop = cluster_n)
+                             pop = cluster_n,
+                             cluster_dis)
+  colnames(cluster_data) <- c("cluster", "vaccine", "pop",
+                              paste0("dis_", cluster_no))
   
 
   # Empty columns for the array
@@ -186,7 +219,15 @@ sir_model <- function(N, C, number_infected, R0, dur_inf,
     for (i in 2:length(time_seq)) {
       
       # Hazards
-      sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j] 
+      sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
+      
+      for (k in 1:C) { # Loop to add external FOI
+        
+        if (k != j) {
+          sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k]
+        }
+        
+      }
       sir[i, 10, j] = 1/dur_inf
       
       # Probabilities
@@ -257,14 +298,13 @@ sir_model <- function(N, C, number_infected, R0, dur_inf,
 }
 
 
-cluster_reference <- function(N, C, p_clusvax) {
+cluster_reference <- function(N, C, cluster_n, cluster_dis, p_clusvax) {
   
   # Cluster vectors
   
   cluster_no <- seq(1:C)                
   
-  n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  
-  cluster_n <- abs(n)                                         
+  cluster_n <- cluster_n                                      
   
   V <- C*p_clusvax                                           
   cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) 
@@ -273,7 +313,11 @@ cluster_reference <- function(N, C, p_clusvax) {
   
   cluster_data <- data.frame(cluster = cluster_no,
                              vaccine = cluster_vstatus,
-                             pop = cluster_n)
+                             pop = cluster_n,
+                             cluster_dis)
+  colnames(cluster_data) <- c("cluster", "vaccine", "pop",
+                              paste0("dis_", cluster_no))
+  
   cluster_data
   
 }
@@ -283,13 +327,15 @@ cluster_reference <- function(N, C, p_clusvax) {
 # SAMPLE RUNS -------------------------------------------------------------
 
 
-sir_1 <- sir_model(N = N, C = C, number_infected = number_infected,
-                   R0 = R0, dur_inf = dur_inf,
+sir_1 <- sir_model(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
+                   number_infected = number_infected,
+                   R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
                    p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
                    p_sym = p_sym, p_test = p_test, p_positive = p_positive,
                    time_step = time_step, years = years)
 
-cluster_1 <- cluster_reference(N = N, C = C, p_clusvax = p_clusvax)
+cluster_1 <- cluster_reference(N = N, C = C, cluster_n = cluster_n,
+                               cluster_dis = cluster_dis, p_clusvax = p_clusvax)
 
 
 #### Graph ####
@@ -297,16 +343,16 @@ cluster_1 <- cluster_reference(N = N, C = C, p_clusvax = p_clusvax)
 ggplot() +
   geom_line(data = filter(sir_1, vaccine == 1),
             mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_Vax")) +
+                          color = "Inf_Vax"), size = rel(1.1)) +
   geom_line(data = filter(sir_1, vaccine == 0),
             mapping = aes(x = time_seq, y = infected, group = cluster,
-                          color = "Inf_No")) +
+                          color = "Inf_No"), size = rel(1.1)) +
   geom_line(data = filter(sir_1, vaccine == 1),
             mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_Vax")) +
+                          color = "Obs_Vax"), size = rel(1.1)) +
   geom_line(data = filter(sir_1, vaccine == 0),
             mapping = aes(x = time_seq, y = observed, group = cluster,
-                          color = "Obs_No")) +
+                          color = "Obs_No"), size = rel(1.1)) +
   scale_color_manual(name = NULL,
                      breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
                      values = c("Inf_Vax" = "steelblue4",
@@ -329,6 +375,54 @@ ggplot() +
     axis.text = element_text(size=rel(1)),
     legend.position = "bottom",
     legend.text = element_text(size=rel(1)))
+
+
+
+# SEVERAL RUNS ------------------------------------------------------------
+
+
+# Function to run the SIR several times
+
+dim(sir_1)
+# One run generates a matrix of 36500 rows (time_points x clusters)
+# and five cols (cluster, vaccine, time_seq, infected and observed)
+
+# To store the results of run we would need an array
+# [number of rows, number of cols, num of runs]
+
+sir_many <- function(..., n_runs) {
+  
+  time_seq <- seq(from = 1, to = 365*years, by = time_step)
+  
+  names_row <- seq(1:(length(time_seq)*C))
+  
+  names_column <- c("cluster", "vaccine", "time_seq", "infected", "observed")
+  
+  names_matrix <- paste0("run_", seq(1:n_runs))
+  
+  output <- array(0, dim = c(length(time_seq)*C, 5, n_runs),
+               dimnames = list(names_row, names_column, names_matrix))
+  
+  for (i in 1:n_runs) {
+    
+    sir_result <- sir_model(...)
+    
+    output[ , , i] <- as.matrix(sir_result)
+  }
+  
+  output
+}
+
+test <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
+                 number_infected = number_infected,
+                 R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
+                 p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
+                 p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                 time_step = time_step, years = years,
+                 n_runs = 10)
+
+
+
 
 
 #### Summary ####
