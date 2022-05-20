@@ -21,8 +21,8 @@ library(tidyverse)
 
 # Total population and number of clusters
 
-N <- 200000                       # Total population in the study
-C <- 100                          # Number of clusters
+N <- 150000                       # Total population in the study
+C <- 80                          # Number of clusters
 
 # The population in each cluster should be the same across runs
 
@@ -339,10 +339,10 @@ sir_many <- function(..., n_runs) {
 }
 
 
-#### Results function ####
+#### Results functions ####
 
 
-# Graph
+# Graph: mainly to check if run was okay
 
 sir_graph <- function(sir_many_result) {
   
@@ -423,7 +423,7 @@ sir_stats <- function(sir_summary_result, n_runs) {
     output[i, 5:6] <- y[2,]
   }
   
-  rownames(output) <- paste0("run_1", seq(1:10))
+  rownames(output) <- paste0("run_", seq(1:10))
   
   colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
                         "2.5%", "97.5%")
