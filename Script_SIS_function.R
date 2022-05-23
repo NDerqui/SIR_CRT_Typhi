@@ -375,7 +375,7 @@ sis_graph <- function(sis_many_result) {
                                   "Detected infections in non-vaccine cluster")) +
     xlim(c(1, 100)) +
     theme_classic() +
-    labs(title = "Incidence over time",
+    labs(title = "Incidence over time (SIS)",
          x = "Time (days)",
          y = "Number of infections/detected infections") +
     theme(
@@ -445,7 +445,7 @@ n_runs <- 10
 
 # Run!
 
-test_sis <- sis_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
+test_sis_80 <- sis_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
                  number_infected = number_infected,
                  R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
                  p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
@@ -455,10 +455,10 @@ test_sis <- sis_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_
 
 # Graph
 
-p_sis <- sis_graph(test_sis)
+plot_sis_80 <- sis_graph(test_sis_80)
 
 # Get summary stats
 
-summary_sis <- sis_summary(test_sis, n_runs)
+summary_sis_80 <- sis_summary(test_sis_80, n_runs)
 
-stats_sis <- sis_stats(summary_sis, n_runs)
+stats_sis_80 <- sis_stats(summary_sis_80, n_runs)
