@@ -371,7 +371,7 @@ sir_graph <- function(sir_many_result) {
                                   "Detected infections in non-vaccine cluster")) +
     xlim(c(1, 100)) +
     theme_classic() +
-    labs(title = "Incidence over time",
+    labs(title = "Incidence over time (SIR)",
          x = "Time (days)",
          y = "Number of infections/detected infections") +
     theme(
@@ -441,7 +441,7 @@ n_runs <- 10
 
 # Run!
 
-test <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
+test_sir_80 <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
                  number_infected = number_infected,
                  R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
                  p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
@@ -451,10 +451,10 @@ test <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
 
 # Graph
 
-p <- sir_graph(test)
+plot_sir_80 <- sir_graph(test_sir_80)
 
 # Get summary stats
 
-summary <- sir_summary(test, n_runs)
+summary_sir_80 <- sir_summary(test_sir_80, n_runs)
 
-stats <- sir_stats(summary, n_runs)
+stats_sir_80 <- sir_stats(summary_sir_80, n_runs)
