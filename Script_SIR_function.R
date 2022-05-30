@@ -455,33 +455,177 @@ sir_summary <- function(sir_many_result, n_runs) {
 }
 
 
-# Poisson regression
+# Poisson regression : direct effects
 
-sir_stats <- function(sir_summary_result, n_runs) {
+sir_direct <- function(sir_summary_result, n_runs) {
+  
+  # Direct effect: vax vs unvax in vaccine cluster
+
+  sir_summary_result <- sir_summary_result %>%
+    
+    # Only measured in vaccine clusters
+    filter(vaccine == 1) %>%
+    select(run, cluster, vaccine, sum_SI, sum_VI) %>%
+    
+    # Pivot to get the incidence SI vs VI only
+    pivot_longer(-c(run, cluster, vaccine),
+                 names_to = "vax_incluster", values_to = "incidence")
+  
+  # Output vector to store the results of the test
   
   output <- matrix(0, ncol = 6, nrow = n_runs)
-  
+
   for (i in 1:n_runs) {
     
-    model <- glm(formula = sum_obs ~ vaccine,
+    model <- glm(formula = incidence ~ vax_incluster,
                  family = "poisson", data = filter(sir_summary_result, run == i))
     
-    x <- exp(summary(model)$coef)
+    # Get the coefficients of the model
     
+    x <- exp(summary(model)$coef)
     y <- exp(confint(model))
     
-    output[i, 1:4] <- x[2,]
+    # Store them
     
+    output[i, 1:4] <- x[2,]
     output[i, 5:6] <- y[2,]
   }
   
-  rownames(output) <- paste0("run_", seq(1:10))
+  # Clean the result vector
   
+  rownames(output) <- paste0("run_", seq(1:10))
   colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
                         "2.5%", "97.5%")
   
   output
 }
+
+
+# Poisson regression : indirect effects
+
+sir_indirect <- function(sir_summary_result, n_runs) {
+  
+  # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
+
+  sir_summary_result <- sir_summary_result %>%
+    
+    # Focus therefore only on incidence S to I
+    select(run, cluster, vaccine, sum_SI) 
+  
+  # Output vector to store the results of the test
+  
+  output <- matrix(0, ncol = 6, nrow = n_runs)
+  
+  for (i in 1:n_runs) {
+    
+    model <- glm(formula = sum_SI ~ vaccine,
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Get the coefficients of the model
+    
+    x <- exp(summary(model)$coef)
+    y <- exp(confint(model))
+    
+    # Store them
+    
+    output[i, 1:4] <- x[2,]
+    output[i, 5:6] <- y[2,]
+  }
+  
+  # Clean the result vector
+  
+  rownames(output) <- paste0("run_", seq(1:10))
+  colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
+                        "2.5%", "97.5%")
+  
+  output
+}
+
+
+# Poisson regression : total effects
+
+sir_total <- function(sir_summary_result, n_runs) {
+  
+  # Total effect: vax in vaccine cluster vs unvax in non-vaccine
+  
+  sir_summary_result <- sir_summary_result %>%
+    select(run, cluster, vaccine, sum_SI, sum_VI, sum_all_inc) %>%
+    
+    # Get one var with VI only from vaccine clusters,
+    # and all incidence from non-vaccine
+    mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
+                                 vaccine == 0 ~ sum_all_inc))
+  
+  # Output vector to store the results of the test
+  
+  output <- matrix(0, ncol = 6, nrow = n_runs)
+  
+  for (i in 1:n_runs) {
+    
+    model <- glm(formula = incidence ~ vaccine,
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Get the coefficients of the model
+    
+    x <- exp(summary(model)$coef)
+    y <- exp(confint(model))
+    
+    # Store them
+    
+    output[i, 1:4] <- x[2,]
+    output[i, 5:6] <- y[2,]
+  }
+  
+  # Clean the result vector
+  
+  rownames(output) <- paste0("run_", seq(1:10))
+  colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
+                        "2.5%", "97.5%")
+  
+  output
+}
+
+
+# Poisson regression : overall effects
+
+sir_overall <- function(sir_summary_result, n_runs) {
+  
+  # Overall effect: all in vaccine cluster vs all in non-vaccine
+  
+  sir_summary_result <- sir_summary_result %>%
+    
+    # We are interested in overall incidence
+    select(run, cluster, vaccine, sum_all_inc)
+
+  # Output vector to store the results of the test
+  
+  output <- matrix(0, ncol = 6, nrow = n_runs)
+  
+  for (i in 1:n_runs) {
+    
+    model <- glm(formula = sum_all_inc ~ vaccine,
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Get the coefficients of the model
+    
+    x <- exp(summary(model)$coef)
+    y <- exp(confint(model))
+    
+    # Store them
+    
+    output[i, 1:4] <- x[2,]
+    output[i, 5:6] <- y[2,]
+  }
+  
+  # Clean the result vector
+  
+  rownames(output) <- paste0("run_", seq(1:10))
+  colnames(output) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
+                        "2.5%", "97.5%")
+  
+  output
+}
+
 
 
 # SAMPLE RUNS -------------------------------------------------------------
@@ -491,7 +635,7 @@ sir_stats <- function(sir_summary_result, n_runs) {
 
 n_runs <- 10
 
-# Run!
+# Run! - We get an overall of the infections and observed infections over time.
 
 test_sir_80 <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
                  number_infected = number_infected,
@@ -505,8 +649,11 @@ test_sir_80 <- sir_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = clust
 
 plot_sir_80 <- sir_graph(test_sir_80)
 
-# Get summary stats
+# Get summary numbers
 
 summary_sir_80 <- sir_summary(test_sir_80, n_runs)
 
-stats_sir_80 <- sir_stats(summary_sir_80, n_runs)
+direct_sir_80 <- sir_direct(summary_sir_80, n_runs)
+indirect_sir_80 <- sir_indirect(summary_sir_80, n_runs)
+total_sir_80 <- sir_total(summary_sir_80, n_runs)
+overall_sir_80 <- sir_overall(summary_sir_80, n_runs)
