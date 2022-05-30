@@ -90,7 +90,8 @@ years <- 1          # Total duration of simulation (years)
 
 sir_model <- function(N, C, cluster_n, cluster_dis,
                       number_infected, R0, dur_inf, imp_rate,
-                      p_vax, p_clusvax, vax_eff, p_sym, p_test, p_positive,
+                      p_vax, p_clusvax, vax_eff,
+                      p_sym, p_test, p_positive,
                       time_step, years) {
 
   
@@ -270,6 +271,24 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
     sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0)
   }
   
+  ## Incidence of infection from S
+  
+  sir_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_inc_SI) <- names_matrix
+  
+  for (i in 1:C) {
+    sir_res_inc_SI[,i] <- sir[,14,i]
+  }
+  
+  ## Incidence of infection from V
+  
+  sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_inc_VI) <- names_matrix
+  
+  for (i in 1:C) {
+    sir_res_inc_VI[,i] <- sir[,15,i]
+  }
+  
   ## Pivot the results and merge all together
   
   sir_res_infected <- sir_res_infected %>%
@@ -288,10 +307,32 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
     merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
     select(c("cluster", "vaccine", "time_seq", "observed"))
   
+  sir_res_inc_SI <- sir_res_inc_SI %>%
+    mutate(time_seq = time_seq) %>%
+    pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_sus_inf") %>%
+    mutate(cluster = readr::parse_number(cluster)) %>%
+    arrange(cluster) %>%
+    merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+    select(c("cluster", "vaccine", "time_seq", "inc_sus_inf"))
+  
+  sir_res_inc_VI <- sir_res_inc_VI %>%
+    mutate(time_seq = time_seq) %>%
+    pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_vax_inf") %>%
+    mutate(cluster = readr::parse_number(cluster)) %>%
+    arrange(cluster) %>%
+    merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+    select(c("cluster", "vaccine", "time_seq", "inc_vax_inf"))
+  
   sir_result <- merge(sir_res_infected, sir_res_observed,
+                      by = c("cluster", "vaccine", "time_seq"), all = TRUE)
+  sir_result <- merge(sir_result, sir_res_inc_SI,
+                      by = c("cluster", "vaccine", "time_seq"), all = TRUE)
+  sir_result <- merge(sir_result, sir_res_inc_VI,
                       by = c("cluster", "vaccine", "time_seq"), all = TRUE)
   sir_result <- arrange(sir_result, cluster, time_seq)
   
+  
+  # Returned object
 
   sir_result
 }
@@ -304,10 +345,9 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
 # Function to run the SIR several times
 
 # One run generates a matrix of time_points x clusters rows
-# and five cols (cluster, vaccine, time_seq, infected and observed)
+# and seven cols (cluster, vaccine, time_seq, infected, observed, inc_SI, inc_VI)
 
-# To store the results of run we would need an array
-# [number of rows, number of cols, num of runs]
+# Append the results of each run to each other
 
 sir_many <- function(..., n_runs) {
   
@@ -320,19 +360,26 @@ sir_many <- function(..., n_runs) {
   
   for (i in 2:n_runs) {
     
+    # Get result of one run
+    
     sir_result <- sir_model(...)
     
     sir_result <- sir_result %>%
       mutate(run = i)
     
+    # Merge to previous
+    
     sir_output <- merge(sir_output, sir_result,
                         by = c("cluster", "vaccine", "time_seq",
-                               "infected", "observed", "run"), all = TRUE)
-    
+                               "infected", "observed", "inc_sus_inf", "inc_vax_inf",
+                               "run"), all = TRUE)
   }
   
+  # Clean the result
+  
   sir_output <- sir_output %>%
-    select("run", "cluster", "vaccine", "time_seq", "infected", "observed") %>%
+    select("run", "cluster", "vaccine", "time_seq",
+           "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
     arrange(run, cluster, time_seq)
   
   sir_output
@@ -393,13 +440,18 @@ sir_summary <- function(sir_many_result, n_runs) {
   summary <- sir_many_result %>%
     group_by(run, cluster) %>%
     mutate(mean_inf = mean(infected)) %>%
-    mutate(mena_obs = mean(observed)) %>%
+    mutate(mean_obs = mean(observed)) %>%
+    mutate(mean_SI = mean(inc_sus_inf)) %>%
+    mutate(mean_VI = mean(inc_vax_inf)) %>%
     mutate(sum_inf = sum(infected)) %>%
     mutate(sum_obs = sum(observed)) %>%
+    mutate(sum_SI = sum(inc_sus_inf)) %>%
+    mutate(sum_VI = sum(inc_vax_inf)) %>%
+    mutate(sum_all_inc = sum_SI + sum_VI) %>%
     filter(row_number() == 1) %>%
-    select(-time_seq, -infected, -observed) %>%
+    select(-time_seq, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
-  
+
 }
 
 
