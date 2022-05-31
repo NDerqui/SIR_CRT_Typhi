@@ -1263,7 +1263,7 @@ colnames(cluster_data) <- c("cluster", "vaccine", "pop",
 
 A <- 3                   # Number of age groups
 
-age_n <- seq(1:A)        # Sequence of age groups
+age_no <- seq(1:A)       # Sequence of age groups
 
 # Age proportion
 
@@ -1272,11 +1272,12 @@ age_prop <- age_prop/sum(age_prop)
 # Establishing the proportion of each age group in each cluster:
 # Assume the same proportions across all clusters
 # Assume no other population (all sum up to 1)
+# Real data to be used here
 
 # Interaction matrix
 
 age_inter <- matrix(1, nrow = A, ncol = A,
-                      dimnames = list(age_n, age_n))
+                      dimnames = list(age_no, age_no))
 # Establishing random interaction patterns across the 3 age groups
 age_inter[lower.tri(age_inter, diag = FALSE)] <- runif(
   n = (A^2 - A)/2, min = 0, max = 1)
@@ -1298,7 +1299,7 @@ names_column <- c("cluster", "vaccine", "time_seq",
 
 names_matrix <- paste0("cluster_", cluster_no)
 
-names_group <- paste0("age_group_", age_n)
+names_group <- paste0("age_group_", age_no)
 
 sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
                haz_inf, haz_rec,lambda, lambda_v, sigma, inc_SI, inc_VI, rec_IR),
@@ -1348,7 +1349,7 @@ for (c in 1:C) {
       
     } else {                                                       # In non-vax clusters
       sir[, 5, c, a] = round((sir[, 4, c, a]-sir[, 7, c, a]), digits = 0)   # Susceptible (non-vax)
-      sir[, 6, c, a] = as.integer(0)                                  # Vaccinated
+      sir[, 6, c, a] = as.integer(0)                                        # Vaccinated
       
     }
   }  
@@ -1364,29 +1365,41 @@ for (c in 1:C) {
     for (t in 2:length(time_seq)) {
       
       # Hazards
-      sir[t, 9, c, a] = beta*sir[t-1, 7, c]/sir[t-1, 4 ,c]
       
-      for (k in 1:C) { # Loop to add external FOI
+      # Loop to add FOI from same age and other age groups in the same cluster
+      # Because inter with its own age group = 1, this is the normal FOI
+      for (i in 1:A) { 
         
-        if (k != c) {
-          sir[t, 9, c, a] = sir[t, 9, c] + (imp_rate/cluster_dis[k,c])*beta*sir[t-1, 7, k]/sir[t-1, 4 ,k]
+        sir[t, 9, c, a] = sir[t, 9, c, a] + age_inter[i, a]*beta*sir[t-1, 7, c, i]/sir[t-1, 4 , c, i]        
+      }
+      # Loop to add external clusters FOI
+      # In each age group
+      for (k in 1:C) { 
+        
+        for (i in 1:A) {
+         
+          if (k != c) {
+            sir[t, 9, c, a] = sir[t, 9, c, a] + age_inter[i, a]*(imp_rate/cluster_dis[k, c])*beta*sir[t-1, 7, k, i]/sir[t-1, 4, k, i]
+          }
         }
-        
       }
       
       sir[t, 10, c, a] = 1/dur_inf
       
       # Probabilities
+      
       sir[t, 11, c, a] = (1 - exp(-sir[t, 9, c, a]*time_step))
       sir[t, 12, c, a] = (1 - exp(-sir[t, 9, c, a]*(1 - vax_eff)*time_step))
       sir[t, 13, c, a] = (1 - exp(-sir[t, 10, c, a])*time_step)  
       
       # State variables
+      
       sir[t, 14, c, a] = round(rbinom(n = 1, size = sir[t-1, 5, c, a], prob = sir[t, 11, c, a]), digits = 0)
       sir[t, 15, c, a] = round(rbinom(n = 1, size = sir[t-1, 6, c, a], prob = sir[t, 12, c, a]), digits = 0)
       sir[t, 16, c, a] = round(rbinom(n = 1, size = sir[t-1, 7, c, a], prob = sir[t, 13, c, a]), digits = 0)  
       
       # Model equations
+      
       sir[t, 5, c, a] = sir[t-1, 5, c, a] - sir[t, 14, c, a]
       sir[t, 6, c, a] = sir[t-1, 6, c, a] - sir[t, 15, c, a]
       
@@ -1403,13 +1416,49 @@ for (c in 1:C) {
 
 # Store results
 
-sir_res_infected <- as.data.frame(matrix(0, # Empty matrix
-                                         nrow = length(time_seq), ncol = C))
-colnames(sir_res_infected) <- names_matrix
+## Infected
 
-for (i in 1:C) {
-  sir_res_infected[,i] <- sir[,7,i]         # Get results from run
+sir_infected <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+colnames(sir_infected) <- names_matrix
+
+for (c in 1:C) {
+  sir_infected[, c] <- sir[, 7, c, 1] # Get results from run in first age group
 }
+
+sir_infected <- sir_infected %>%
+  mutate(age_group = 1) %>%
+  mutate(time_seq = time_seq)
+
+sir_res_infected <- sir_infected
+
+for (a in 2:A) {
+  
+  sir_infected <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_infected) <- names_matrix
+  
+  for (c in 1:C) {
+    sir_infected[, c] <- sir[, 7, c, a] # Get results from run in that age group
+  }
+  
+  sir_infected <- sir_infected %>%
+    mutate(age_group = a) %>%
+    mutate(time_seq = time_seq)
+  
+  sir_res_infected <- merge(sir_res_infected, sir_infected,
+                            by = c(names_matrix, "age_group", "time_seq"), all = TRUE)
+  
+  sir_res_infected <- sir_res_infected %>%
+    select(age_group, time_seq, all_of(names_matrix)) %>%
+    arrange(age_group, time_seq)
+  
+}
+
+
+
+
+
+
+
 
 sir_res_observed <- as.data.frame(matrix(0, # Empty matrix
                                          nrow = length(time_seq), ncol = C))
@@ -1419,7 +1468,23 @@ for (i in 1:C) {
   sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0) # Results from run x prob of detecting that infected
 }
 
-# Pivot the results and merge all together (infected and observed)
+sir_res_inc_SI <- as.data.frame(matrix(0,   # Empty matrix
+                                       nrow = length(time_seq), ncol = C))
+colnames(sir_res_inc_SI) <- names_matrix
+
+for (i in 1:C) {
+  sir_res_inc_SI[,i] <- sir[,14,i]          # Get results from run
+}
+
+sir_res_inc_VI <- as.data.frame(matrix(0,   # Empty matrix
+                                       nrow = length(time_seq), ncol = C))
+colnames(sir_res_inc_VI) <- names_matrix
+
+for (i in 1:C) {
+  sir_res_inc_VI[,i] <- sir[,15,i]          # Get results from run
+}
+
+# Pivot the results and merge all together (infected, observed, and incidence)
 
 sir_res_infected <- sir_res_infected %>%
   mutate(time_seq = time_seq) %>%
@@ -1437,9 +1502,31 @@ sir_res_observed <- sir_res_observed %>%
   merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
   select(c("cluster", "vaccine", "time_seq", "observed"))
 
-sir_result <- merge(sir_res_infected, sir_res_observed,
-                    by = c("cluster", "vaccine", "time_seq"), all = TRUE)
-sir_result <- arrange(sir_result, cluster, time_seq)
+sir_res_inc_SI <- sir_res_inc_SI %>%
+  mutate(time_seq = time_seq) %>%
+  pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_sus_inf") %>%
+  mutate(cluster = readr::parse_number(cluster)) %>%
+  arrange(cluster) %>%
+  merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+  select(c("cluster", "vaccine", "time_seq", "inc_sus_inf"))
+
+sir_res_inc_VI <- sir_res_inc_VI %>%
+  mutate(time_seq = time_seq) %>%
+  pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_vax_inf") %>%
+  mutate(cluster = readr::parse_number(cluster)) %>%
+  arrange(cluster) %>%
+  merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+  select(c("cluster", "vaccine", "time_seq", "inc_vax_inf"))
+
+
+
+
+
+
+
+
+
+
 
 # Simple graph (mainly to check if model was OK)
 
