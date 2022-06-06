@@ -11,6 +11,8 @@
 rm(list = ls())
 
 library(tidyverse)
+library(sandwich)
+library(lmtest)
 
 
 
@@ -480,15 +482,21 @@ sir_direct <- function(sir_summary_result, n_runs) {
     model <- glm(formula = incidence ~ vax_incluster,
                  family = "poisson", data = filter(sir_summary_result, run == i))
     
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
+    
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -521,15 +529,21 @@ sir_indirect <- function(sir_summary_result, n_runs) {
     model <- glm(formula = sum_SI ~ vaccine,
                  family = "poisson", data = filter(sir_summary_result, run == i))
     
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
+    
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -565,15 +579,21 @@ sir_total <- function(sir_summary_result, n_runs) {
     model <- glm(formula = incidence ~ vaccine,
                  family = "poisson", data = filter(sir_summary_result, run == i))
     
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
+    
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -606,15 +626,21 @@ sir_overall <- function(sir_summary_result, n_runs) {
     model <- glm(formula = sum_all_inc ~ vaccine,
                  family = "poisson", data = filter(sir_summary_result, run == i))
     
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
+    
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
