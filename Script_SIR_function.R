@@ -47,13 +47,14 @@ cluster_n <- abs(n)                                         # Vector of cluster 
 
 # Doing this with a network package (possibly better than just a random matrix)
 
-edge_values <- round(runif(n = C*C , min = 1, max = 100))*round(runif(n = C*C, min = 0, max = .51))
+edge_values <- round(runif(n = C*C , min = 1, max = 100))*round(runif(n = C*C, min = 0, max = .52))
 # Edge values: each connection between clusters can be from 1 to 100
 # Multiplied against an indicator of whether there is an edge or not
+# To make less or more connected network, change the last number (0.505 - 0.525)
 
 cluster_edge <- matrix(edge_values, nrow = C, ncol = C)
 diag(cluster_edge) <- 0
-# Matrix with each pair of cluster connection
+# Matrix with each pair of cluster connection: 0 No connection, No, How strong connection
 cluster_edge[upper.tri(cluster_edge, diag = FALSE)] <- t(cluster_edge)[upper.tri(cluster_edge)]
 # Mirror cluster distance
 edge_values <- as.numeric(cluster_edge)
@@ -70,18 +71,35 @@ cluster_network <- as.network(x = cluster_edge, # the network object
 set.vertex.attribute(cluster_network,"Pop size", cluster_n)
 # Cluster(node) level attribute (let's put the population size!)
 set.edge.value(cluster_network,"Distance",edge_values)
-# Edge level attribute (conection between clusters)
+# Edge level attribute (connection between clusters)
 
 summary.network(cluster_network,print.adj = FALSE)
 plot.network(cluster_network)
-# Get a summary and a plot
+# Get a summary and a plot: check only
 
 # Cluster distance matrix
 
 # In network objects, the more edge value, the more connection
 # But this should be translated into less distance
 
-cluster_dis <- 1/cluster_edge*100
+cluster_dis <- matrix(NA, ncol = C, nrow = C)
+
+for (i in 1:C) {
+  for (j in i:C) {
+    if (cluster_edge[i,j] == 0) {
+      cluster_dis[i, j] <- cluster_edge[i, j]
+    } else {
+      cluster_dis[i, j] <- 1/cluster_edge[i, j]
+    }
+  }
+}
+cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[lower.tri(cluster_dis)]
+cluster_dis <- round(cluster_dis*100, digits = 2)
+diag(cluster_dis) <- 1
+# Now the distance matrix is at follows:
+# 0 means no connection
+# 1 means the same cluster
+# A number means a connection, with that number specifying the "distance" (more distance, less connection)
 
 
 #### Prevalence ####
@@ -266,7 +284,7 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
         
         if (k != j) {
           
-          while(cluster_dis[k, j] != 0) { # Add FOI for the clusters that are close to each other only
+          if (cluster_dis[k, j] != 0) { # Add FOI for the clusters that are close to each other only
             sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
           }
         }
