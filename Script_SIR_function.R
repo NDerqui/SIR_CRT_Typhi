@@ -13,6 +13,7 @@ rm(list = ls())
 library(tidyverse)
 library(sandwich)
 library(lmtest)
+library(statnet)
 
 
 
@@ -36,13 +37,51 @@ cluster_n <- abs(n)                                         # Vector of cluster 
 
 # Distance matrix across clusters (should be the same across runs)
 
-cluster_dis <- matrix(1, nrow = C, ncol = C,                   # Matrix with distance between each pair of clusters
-                      dimnames = list(seq(1:C), seq(1:C)))
+# cluster_dis <- matrix(1, nrow = C, ncol = C,                   # Matrix with distance between each pair of clusters
+#                       dimnames = list(seq(1:C), seq(1:C)))
+# 
+# cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- runif(    # Filled with random numbers in a symmetrical way
+#   n = (C^2 - C)/2, min = 1, max = 100)
+# cluster_dis[upper.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[upper.tri(cluster_dis)]
+# cluster_dis <- round(cluster_dis, digits = 1)
 
-cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- runif(    # Filled with random numbers in a symmetrical way
-  n = (C^2 - C)/2, min = 1, max = 100)
-cluster_dis[upper.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[upper.tri(cluster_dis)]
-cluster_dis <- round(cluster_dis, digits = 1)
+# Doing this with a network package (possibly better than just a random matrix)
+
+edge_values <- round(runif(n = C*C , min = 1, max = 100))*round(runif(n = C*C, min = 0, max = .51))
+# Edge values: each connection between clusters can be from 1 to 100
+# Multiplied against an indicator of whether there is an edge or not
+
+cluster_edge <- matrix(edge_values, nrow = C, ncol = C)
+diag(cluster_edge) <- 0
+# Matrix with each pair of cluster connection
+cluster_edge[upper.tri(cluster_edge, diag = FALSE)] <- t(cluster_edge)[upper.tri(cluster_edge)]
+# Mirror cluster distance
+edge_values <- as.numeric(cluster_edge)
+# Reset the edge values with the mirrored matrix
+
+# Network object
+
+cluster_network <- as.network(x = cluster_edge, # the network object
+                             directed = FALSE, # specify whether the network is directed
+                             loops = FALSE, # do we allow self ties (should not allow them)
+                             matrix.type = "adjacency" # the type of input
+)
+
+set.vertex.attribute(cluster_network,"Pop size", cluster_n)
+# Cluster(node) level attribute (let's put the population size!)
+set.edge.value(cluster_network,"Distance",edge_values)
+# Edge level attribute (conection between clusters)
+
+summary.network(cluster_network,print.adj = FALSE)
+plot.network(cluster_network)
+# Get a summary and a plot
+
+# Cluster distance matrix
+
+# In network objects, the more edge value, the more connection
+# But this should be translated into less distance
+
+cluster_dis <- 1/cluster_edge*100
 
 
 #### Prevalence ####
@@ -77,7 +116,7 @@ vax_eff <- 0.8     # Vaccine effectiveness (infection)
 
 p_sym <- 0.55       # Probability of being symptomatic - CHECK
 p_test <- 0.50      # Probability of seeking a test - CHECK
-p_positive <- 0.80  # Probability of test being positive
+p_positive <- 0.60  # Probability of test being positive
 
 
 #### Time frame ####
@@ -226,7 +265,10 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
       for (k in 1:C) { # Loop to add external FOI
         
         if (k != j) {
-          sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k]
+          
+          while(cluster_dis[k, j] != 0) { # Add FOI for the clusters that are close to each other only
+            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
+          }
         }
         
       }
