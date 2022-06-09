@@ -14,72 +14,20 @@
 rm(list = ls())
 
 library(tidyverse)
+library(sandwich)
+library(lmtest)
+library(statnet)
+library(ggnet)
 
 
 
 # PARAMETERS --------------------------------------------------------------
 
 
-# Need to set these so they are fixed across the entire simulation
+# Parameters to be fixed across all runs
 
 
-#### Basic ####
-
-# Total population and number of clusters
-
-N <- 150000                       # Total population in the study
-C <- 80                           # Number of clusters
-
-# Population in each cluster
-
-n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
-cluster_n <- abs(n)                                         # Vector of cluster populations
-
-
-#### Clusters ####
-
-# Doing this with a network package (possibly better than just a random matrix)
-
-# Creating the edges of the network: 0 - no connection, 1 - poor connection, 100 - strong connection
-edge_values <- round(runif(n = C*C , min = 1, max = 100))*round(runif(n = C*C, min = 0, max = .52))
-cluster_edge <- matrix(edge_values, nrow = C, ncol = C)
-diag(cluster_edge) <- 0
-cluster_edge[upper.tri(cluster_edge, diag = FALSE)] <- t(cluster_edge)[upper.tri(cluster_edge)]
-edge_values <- as.numeric(cluster_edge)
-
-# Network object
-cluster_network <- as.network(x = cluster_edge, 
-                              directed = FALSE, 
-                              loops = FALSE, 
-                              matrix.type = "adjacency"
-)
-set.vertex.attribute(cluster_network,"Pop size", cluster_n)
-set.edge.value(cluster_network,"Distance",edge_values)
-summary.network(cluster_network,print.adj = FALSE)
-plot.network(cluster_network)
-
-# Cluster distance matrix
-
-# 0 means no connection
-# 1 means the same cluster
-# Distance is inversely proportional to connection
-
-cluster_dis <- matrix(NA, ncol = C, nrow = C)
-for (i in 1:C) {
-  for (j in i:C) {
-    if (cluster_edge[i,j] == 0) {
-      cluster_dis[i, j] <- cluster_edge[i, j]
-    } else {
-      cluster_dis[i, j] <- 1/cluster_edge[i, j]
-    }
-  }
-}
-cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[lower.tri(cluster_dis)]
-cluster_dis <- round(cluster_dis*100, digits = 2)
-diag(cluster_dis) <- 1
-
-
-#### India data ####
+#### Incidence, birth and death ####
 
 # Prevalence of infection in India
 # Incidence according to GDB 2017
@@ -89,13 +37,14 @@ incidence <- 0.005492 # 549.2 cases per 100,000
 # Birth rate
 # The World Bank Data 2020
 
-# birth <- 0.017 # 17 per 1,000
-birth <- 0.008
+# birth <- 0.017      # 17 per 1,000
+birth <- 0.010
 
 # Death rate
 # The World Bank Data 2020
 
-death <- 0.007 # 7 per 1,000
+# death <- 0.007        # 7 per 1,000
+death <- 0.015        # 7 per 1,000
 
 
 #### Force of infection ####
@@ -108,11 +57,10 @@ dur_inf <- 7       # Duration of infectiousness (days)
 # Importation rate: from external clusters to a given one (??)
 
 imp_rate <- 0.5
+imp_rate <- 0.25
 
 
 #### Vaccination ####
-
-# coverage and effect
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
@@ -123,12 +71,97 @@ vax_eff <- 0.8     # Vaccine effectiveness (infection)
 
 p_sym <- 0.55       # Probability of being symptomatic - CHECK
 p_test <- 0.50      # Probability of seeking a test - CHECK
-p_positive <- 0.80  # Probability of test being positive
+p_positive <- 0.60  # Probability of test being positive
 
 
 #### Time frame ####
 
 time_step <- 1      # Time step change (days)
+years <- 1          # Total duration of simulation (years)
+
+
+#### Population ####
+
+# Total population in the study and number of clusters
+
+N <- 200000                       # Total population in the study
+C <- 100                          # Number of clusters
+
+n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
+cluster_n <- abs(n)                                         # Vector of cluster populations
+hist(cluster_n, main = "Histogram of clusters' population",
+     xlab = "Clusters' population", ylab = "Frequency of clusters")
+
+
+#### Clusters ####
+
+# Vector of clusters
+
+cluster_no <- seq(1:C)
+
+# Vaccination status of clusters
+
+V <- C*p_clusvax                                           # Number of clusters in the vaccine group
+cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+
+
+# Cluster map
+# Random location of clusters (cannot be in order, we vax the first proportion)
+
+cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
+                      dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+
+# Cluster distance matrix
+
+cluster_dis <- matrix(1, nrow = C, ncol = C,
+                      dimnames = list(seq(1:C), seq(1:C)))
+
+for (i in 1:C) {                          # Each cluster distance
+  for (j in 1:C) {                        # with each of the others
+    
+    for (k in 1:sqrt(C)) {                # Look for location of first cluster
+      for (l in 1:sqrt(C)) {
+        if (i == cluster_map[k, l]) {
+          
+          for (m in 1:sqrt(C)) {          # Look for location of second cluster
+            for (n in 1:sqrt(C)) {
+              if (j == cluster_map[m, n]) {
+                
+                # Function to get the distance
+                
+                vertical <- abs(m - k)
+                horizontal <- abs(n - l)
+                distance <- sqrt(horizontal^2 + vertical^2)
+                
+                cluster_dis[i, j] <- round(distance, digits = 3)
+              }
+            }
+          }
+          
+        }
+      }
+    }
+    
+  }
+}
+diag(cluster_dis) <- 1
+
+# Network object
+
+cluster_network <- as.network(x = cluster_dis,
+                              directed = FALSE,
+                              loops = FALSE,
+                              matrix.type = "adjacency"
+)
+set.vertex.attribute(cluster_network,"Number", cluster_no)
+set.vertex.attribute(cluster_network,"Vaccine", cluster_vstatus)
+set.vertex.attribute(cluster_network,"Pop", cluster_n)
+# Cluster(node) level attribute (let's put the number, pop and vax status)
+edge_values <- as.numeric(1/cluster_dis)
+set.edge.value(cluster_network, "Distance", edge_values)
+# Edge(connection) level attribute (inversely proportion to distance)
+
+summary.network(cluster_network,print.adj = FALSE)
 
 
 
@@ -140,7 +173,7 @@ time_step <- 1      # Time step change (days)
 # Death will be a competing risk
 # Results will be used as starting point for the CRT simulation
 
-equilibrium <- function(N, C, cluster_n, cluster_dis,
+equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
                       number_infected, R0, dur_inf, imp_rate,
                       time_step, years) {
   
@@ -155,7 +188,7 @@ equilibrium <- function(N, C, cluster_n, cluster_dis,
 
   # Cluster vectors
   
-  cluster_no <- seq(1:C)                    # Vector of clusters
+  cluster_no <- cluster_no                  # Vector of clusters
   cluster_n <- cluster_n                    # Vector of cluster populations
   
 
@@ -237,7 +270,7 @@ equilibrium <- function(N, C, cluster_n, cluster_dis,
   # S, I, D and R
   for (i in 1:C) {
     sir[, 5, i] = round(incidence*sir[, 3, i], digits = 0)     # Initial I depends on incidence rate
-    sir[, 4, i] = round((sir[, 3 ,i]-sir[, 5, i]), digits = 0) # Initial V depends on N - I
+    sir[, 4, i] = round((sir[, 3 ,i]-sir[, 5, i]), digits = 0) # Initial S depends on N - I
     sir[, 6, i] = 0
     sir[, 7, i] = 0
   }
@@ -254,9 +287,7 @@ equilibrium <- function(N, C, cluster_n, cluster_dis,
       sir[i, 8, j] = beta*sir[i-1, 5, j]/sir[i-1, 3, j] # Initial hazard of infection
       for (k in 1:C) { # Loop to add external FOI
         if (k != j) {
-          if (cluster_dis[k, j] != 0) { # Add FOI for the clusters that are close to each other only
-            sir[i, 8, j] = sir[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 5, k]/sir[i-1, 3 ,k] 
-          }
+          sir[i, 8, j] = sir[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 5, k]/sir[i-1, 3 ,k] 
         }
       }
       sir[i, 9, j] = death
@@ -287,14 +318,14 @@ equilibrium <- function(N, C, cluster_n, cluster_dis,
       # Probability
       sir[i, 20, j] = (1 - exp(-sir[i, 19, j])*time_step)  
       # State 
-      sir[i, 21, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 20, j]), digits = 0) 
+      sir[i, 21, j] = round(rbinom(n = 1, size = sir[i-1, 3, j], prob = sir[i, 20, j]), digits = 0) 
       
       # Model equations
       sir[i, 4, j] = sir[i-1, 4, j] - sir[i, 11, j] + sir[i, 21, j]
       sir[i, 5, j] = sir[i-1, 5, j] + sir[i, 14, j] - sir[i, 18, j]
       sir[i, 6, j] = sir[i-1, 6, j] + sir[i, 15, j]
       sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 18, j]
-      sir[i, 3, j] = sir[i, 4, j] + sir[i, 5, j] + sir[i, 7, j]
+      sir[i, 3, j] = sir[i-1, 3, j] + sir[i, 21, j] - sir[i, 15, j]
     }
   }
   
