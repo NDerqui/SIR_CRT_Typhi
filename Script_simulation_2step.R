@@ -38,13 +38,13 @@ incidence <- 0.005492 # 549.2 cases per 100,000
 # The World Bank Data 2020
 
 # birth <- 0.017      # 17 per 1,000
-birth <- 0.010
+birth <- 0.007
 
 # Death rate
 # The World Bank Data 2020
 
 # death <- 0.007        # 7 per 1,000
-death <- 0.015        # 7 per 1,000
+death <- 0.007        # 7 per 1,000
 
 
 #### Force of infection ####
@@ -77,7 +77,6 @@ p_positive <- 0.60  # Probability of test being positive
 #### Time frame ####
 
 time_step <- 1      # Time step change (days)
-years <- 1          # Total duration of simulation (years)
 
 
 #### Population ####
@@ -173,9 +172,9 @@ summary.network(cluster_network,print.adj = FALSE)
 # Death will be a competing risk
 # Results will be used as starting point for the CRT simulation
 
-equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
-                      number_infected, R0, dur_inf, imp_rate,
-                      time_step, years) {
+equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
+                        incidence, R0, dur_inf, imp_rate,
+                        time_step, years) {
   
   
   time_seq <- seq(from = 1, to = 365*years, by = time_step) # Total time   
@@ -190,6 +189,7 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   
   cluster_no <- cluster_no                  # Vector of clusters
   cluster_n <- cluster_n                    # Vector of cluster populations
+  cluster_vstatus <- cluster_vstatus    # Flag for vax clusters
   
 
   # Empty columns for the array
@@ -197,6 +197,7 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   ## Basic cluster indications
   
   cluster <- rep(0, times = length(time_seq))
+  v_cluster <- rep(0, times = length(time_seq))
   #time_seq is the second col
   
   ## SIR model compartments
@@ -204,22 +205,16 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   no_N <- as.integer(rep(0, times = length(time_seq)))     # Total n per cluster
   no_S <- as.integer(rep(0, times = length(time_seq)))     # Susceptible 
   no_I <- as.integer(rep(0, times = length(time_seq)))     # Infected 
-  no_D <- as.integer(rep(0, times = length(time_seq)))     # Dead
   no_R <- as.integer(rep(0, times = length(time_seq)))     # Recovered
   
-  ## From S to I or D
+  ## From S to I
   
   # Hazard
   haz_inf <- rep(0, times = length(time_seq))
-  haz_dea <- rep(0, times = length(time_seq))
   # Probability: 1 - exp(hazard)
-  prob_event <- rep(0, times = length(time_seq))
   prob_infec <- rep(0, times = length(time_seq))
-  prob_death <- rep(0, times = length(time_seq))
   # State variables
-  inc_Sx <- as.integer(rep(0, times = length(time_seq)))
-  inc_xI <- as.integer(rep(0, times = length(time_seq)))
-  inc_xD <- as.integer(rep(0, times = length(time_seq)))
+  inc_SI <- as.integer(rep(0, times = length(time_seq)))
   
   ## From I to R
   
@@ -230,14 +225,23 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   # State variable
   inc_IR <- as.integer(rep(0, times = length(time_seq)))
   
-  ## Birth rate
+  ## Deaths
+  
+  # Hazard
+  haz_dea <- rep(0, times = length(time_seq))
+  # Probability: 1 - exp(hazard)
+  prob_death <- rep(0, times = length(time_seq))
+  # State variable
+  inc_SD <- as.integer(rep(0, times = length(time_seq)))
+  
+  ## Births
   
   # Hazard
   haz_bir <- rep(0, times = length(time_seq))
   # Probability: 1 -exp(hazard)
   prob_birth <- rep(0, times = length(time_seq))
   # State variable
-  inc_BI <- as.integer(rep(0, times = length(time_seq)))
+  inc_BS <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -245,19 +249,23 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   ## Basic structure
   
   names_row <- paste0("t_", time_seq)
-  names_column <- c("cluster", "time_seq",
-                    "no_N", "no_S", "no_I", "no_D", "no_R",
-                    "haz_inf", "haz_dea", "prob_event", "inc_Sx",
-                    "prob_infec", "prob_death", "inc_xI", "inc_xD",
-                    "haz_rec", "prob_recov", "in_IR",
-                    "haz_birth", "prob_birth", "inc_BI")
+  
+  names_column <- c("cluster", "vax_status", "time_seq", 
+                    "no_N", "no_S", "no_I", "no_R",
+                    "haz_inf","prob_infec", "inc_SI",
+                    "haz_rec", "prob_recov", "inc_IR",
+                    "haz_dea", "prob_death", "inc_SD",
+                    "haz_bir", "prob_birth", "inc_BS")
+  
   names_matrix <- paste0("cluster_", cluster_no)
-  sir <- array(c(cluster, time_seq, no_N, no_S, no_I, no_D, no_R,
-                 haz_inf, haz_dea, prob_event, inc_Sx,
-                 prob_infec, prob_death, inc_xI, inc_xD,
+  
+  sir <- array(c(cluster, v_cluster, time_seq,
+                 no_N, no_S, no_I, no_R,
+                 haz_inf, prob_infec, inc_SI,
                  haz_rec, prob_recov, inc_IR,
-                 haz_bir, prob_birth, inc_BI),
-               dim = c(length(time_seq), 21, C),
+                 haz_dea, prob_death, inc_SD,
+                 haz_bir, prob_birth, inc_BS),
+               dim = c(length(time_seq), 19, C),
                dimnames = list(names_row, names_column, names_matrix))
   
   ## Assign initial values
@@ -265,13 +273,13 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
   # Cluster number and no_N
   for (i in 1:C) {
     sir[, 1, i] = cluster_no[i]
-    sir[, 3, i] = cluster_n[i]
+    sir[, 2, i] = cluster_vstatus[i]
+    sir[, 4, i] = cluster_n[i]
   }
   # S, I, D and R
   for (i in 1:C) {
-    sir[, 5, i] = round(incidence*sir[, 3, i], digits = 0)     # Initial I depends on incidence rate
-    sir[, 4, i] = round((sir[, 3 ,i]-sir[, 5, i]), digits = 0) # Initial S depends on N - I
-    sir[, 6, i] = 0
+    sir[, 6, i] = round(incidence*sir[, 4, i], digits = 0)     # Initial I depends on incidence rate
+    sir[, 5, i] = round((sir[, 4 ,i]-sir[, 6, i]), digits = 0) # Initial S depends on N - I
     sir[, 7, i] = 0
   }
 
@@ -282,50 +290,42 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_dis,
     
     for (i in 2:length(time_seq)) {
       
-      # From S to something
-      # Hazards: infection and death
-      sir[i, 8, j] = beta*sir[i-1, 5, j]/sir[i-1, 3, j] # Initial hazard of infection
-      for (k in 1:C) { # Loop to add external FOI
+      # From S to I
+      
+      sir[i, 8, j] = beta*sir[i-1, 6, j]/sir[i-1, 4, j]     # Initial FOI: from cluster
+      for (k in 1:C) {                                      # Loop to add external FOI
         if (k != j) {
-          sir[i, 8, j] = sir[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 5, k]/sir[i-1, 3 ,k] 
+          sir[i, 8, j] = sir[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 6, k]/sir[i-1, 4 ,k] 
         }
       }
-      sir[i, 9, j] = death
-      # Prob of something happening: sum of hazards
-      sir[i, 10, j] = (1 - exp(-(sir[i, 8, j]+sir[i, 9, j])*time_step))
-      # State: people from S to which something will occur
-      sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 10, j]), digits = 0)
       
-      # From something to I or D
-      # Probabilities: ratio of the two hazards
-      sir[i, 12, j] = sir[i, 8, j]/(sir[i, 8, j]+sir[i, 9, j])
-      sir[i, 13, j] = sir[i, 9, j]/(sir[i, 8, j]+sir[i, 9, j])
-      # State: from the compartment of people to which something may happen
-      sir[i, 14, j] = round(rbinom(n = 1, size = sir[i, 11, j], prob = sir[i, 12, j]), digits = 0)
-      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i, 11, j], prob = sir[i, 13, j]), digits = 0)
+      sir[i, 9, j] = (1 - exp(-sir[i, 8, j]*time_step))
+      sir[i, 10, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 9, j]), digits = 0)
       
       # From I to R
-      # Hazard
-      sir[i, 16, j] = 1/dur_inf
-      # Probability
-      sir[i, 17, j] = (1 - exp(-sir[i, 16, j])*time_step)  
-      # State 
-      sir[i, 18, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 17, j]), digits = 0) 
+      
+      sir[i, 11, j] = 1/dur_inf
+      sir[i, 12, j] = (1 - exp(-sir[i, 11, j])*time_step)  
+      sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0) 
+      
+      # Deaths
+      
+      sir[i, 14, j] = death
+      sir[i, 15, j] = (1 - exp(-sir[i, 14, j])*time_step)  
+      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 15, j]), digits = 0) 
       
       # Births
-      # Hazard
-      sir[i, 19, j] = birth
-      # Probability
-      sir[i, 20, j] = (1 - exp(-sir[i, 19, j])*time_step)  
-      # State 
-      sir[i, 21, j] = round(rbinom(n = 1, size = sir[i-1, 3, j], prob = sir[i, 20, j]), digits = 0) 
+      
+      sir[i, 17, j] = birth
+      sir[i, 18, j] = (1 - exp(-sir[i, 17, j])*time_step)  
+      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 18, j]), digits = 0) 
       
       # Model equations
-      sir[i, 4, j] = sir[i-1, 4, j] - sir[i, 11, j] + sir[i, 21, j]
-      sir[i, 5, j] = sir[i-1, 5, j] + sir[i, 14, j] - sir[i, 18, j]
-      sir[i, 6, j] = sir[i-1, 6, j] + sir[i, 15, j]
-      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 18, j]
-      sir[i, 3, j] = sir[i-1, 3, j] + sir[i, 21, j] - sir[i, 15, j]
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 10, j] - sir[i, 16, j] + sir[i, 19, j]
+      sir[i, 6, j] = sir[i-1, 6, j] + sir[i, 10, j] - sir[i, 13, j]
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 13, j]
+      #sir[i, 4, j] = sir[i-1, 4, j] - sir[i, 16, j] + sir[i, 19, j]
+      
     }
   }
   
