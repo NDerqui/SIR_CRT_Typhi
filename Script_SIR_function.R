@@ -229,7 +229,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
   inc_VI <- as.integer(rep(0, times = length(time_seq)))
-  rec_IR <- as.integer(rep(0, times = length(time_seq)))
+  inc_IR <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -242,12 +242,12 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
                     "no_N", "no_S", "no_V", "no_I", "no_R",
                     "haz_inf", "haz_rec",
                     "prob_SI", "prob_VI", "prob_IR",
-                    "inc_SI", "inc_VI", "rec_IR")
+                    "inc_SI", "inc_VI", "inc_IR")
   
   names_matrix <- paste0("cluster_", cluster_no)
   
   sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, haz_rec,prob_SI, prob_VI, prob_IR, inc_SI, inc_VI, rec_IR),
+                 haz_inf, haz_rec,prob_SI, prob_VI, prob_IR, inc_SI, inc_VI, inc_IR),
                dim = c(length(time_seq), 16, C),
                dimnames = list(names_row, names_column, names_matrix))
   
