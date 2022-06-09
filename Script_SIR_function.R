@@ -14,99 +14,32 @@ library(tidyverse)
 library(sandwich)
 library(lmtest)
 library(statnet)
+library(ggnet)
 
 
 
 # PARAMETERS --------------------------------------------------------------
 
 
-#### Basic ####
-
-# Total population and number of clusters
-
-N <- 150000                       # Total population in the study
-C <- 80                          # Number of clusters
-
-# The population in each cluster should be the same across runs
-
-n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
-cluster_n <- abs(n)                                         # Vector of cluster populations
+# Parameters to be fixed across all runs
 
 
-#### Clusters ####
+#### Incidence, birth and death ####
 
-# Distance matrix across clusters (should be the same across runs)
+# Prevalence of infection in India
+# Incidence according to GDB 2017
 
-# cluster_dis <- matrix(1, nrow = C, ncol = C,                   # Matrix with distance between each pair of clusters
-#                       dimnames = list(seq(1:C), seq(1:C)))
-# 
-# cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- runif(    # Filled with random numbers in a symmetrical way
-#   n = (C^2 - C)/2, min = 1, max = 100)
-# cluster_dis[upper.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[upper.tri(cluster_dis)]
-# cluster_dis <- round(cluster_dis, digits = 1)
+incidence <- 0.005492 # 549.2 cases per 100,000
 
-# Doing this with a network package (possibly better than just a random matrix)
+# Birth rate
+# The World Bank Data 2020
 
-edge_values <- round(runif(n = C*C , min = 1, max = 100))*round(runif(n = C*C, min = 0, max = .52))
-# Edge values: each connection between clusters can be from 1 to 100
-# Multiplied against an indicator of whether there is an edge or not
-# To make less or more connected network, change the last number (0.505 - 0.525)
+birth <- 0.017      # 17 per 1,000
 
-cluster_edge <- matrix(edge_values, nrow = C, ncol = C)
-diag(cluster_edge) <- 0
-# Matrix with each pair of cluster connection: 0 No connection, No, How strong connection
-cluster_edge[upper.tri(cluster_edge, diag = FALSE)] <- t(cluster_edge)[upper.tri(cluster_edge)]
-# Mirror cluster distance
-edge_values <- as.numeric(cluster_edge)
-# Reset the edge values with the mirrored matrix
+# Death rate
+# The World Bank Data 2020
 
-# Network object
-
-cluster_network <- as.network(x = cluster_edge, # the network object
-                             directed = FALSE, # specify whether the network is directed
-                             loops = FALSE, # do we allow self ties (should not allow them)
-                             matrix.type = "adjacency" # the type of input
-)
-
-set.vertex.attribute(cluster_network,"Pop size", cluster_n)
-# Cluster(node) level attribute (let's put the population size!)
-set.edge.value(cluster_network,"Distance",edge_values)
-# Edge level attribute (connection between clusters)
-
-summary.network(cluster_network,print.adj = FALSE)
-plot.network(cluster_network)
-# Get a summary and a plot: check only
-
-# Cluster distance matrix
-
-# In network objects, the more edge value, the more connection
-# But this should be translated into less distance
-
-cluster_dis <- matrix(NA, ncol = C, nrow = C)
-
-for (i in 1:C) {
-  for (j in i:C) {
-    if (cluster_edge[i,j] == 0) {
-      cluster_dis[i, j] <- cluster_edge[i, j]
-    } else {
-      cluster_dis[i, j] <- 1/cluster_edge[i, j]
-    }
-  }
-}
-cluster_dis[lower.tri(cluster_dis, diag = FALSE)] <- t(cluster_dis)[lower.tri(cluster_dis)]
-cluster_dis <- round(cluster_dis*100, digits = 2)
-diag(cluster_dis) <- 1
-# Now the distance matrix is at follows:
-# 0 means no connection
-# 1 means the same cluster
-# A number means a connection, with that number specifying the "distance" (more distance, less connection)
-
-
-#### Prevalence ####
-
-# Starting seed of epidemic
-
-number_infected <- as.integer(10) # Number of initially infected in the cluster
+death <- 0.007        # 7 per 1,000
 
 
 #### Force of infection ####
@@ -114,16 +47,15 @@ number_infected <- as.integer(10) # Number of initially infected in the cluster
 # (infections/time): beta = R0/Duration of infectiousness
 
 R0 <- 2            # Basic reproduction number
-dur_inf <- 3       # Duration of infectiousness (days)
+dur_inf <- 7       # Duration of infectiousness (days)
 
-# Importation rate: from external clusters to a given one
+# Importation rate: from external clusters to a given one (??)
 
+imp_rate <- 0.5
 imp_rate <- 0.25
 
 
 #### Vaccination ####
-
-# coverage and effect
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
@@ -143,12 +75,96 @@ time_step <- 1      # Time step change (days)
 years <- 1          # Total duration of simulation (years)
 
 
+#### Population ####
+
+# Total population in the study and number of clusters
+
+N <- 200000                       # Total population in the study
+C <- 100                          # Number of clusters
+
+n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
+cluster_n <- abs(n)                                         # Vector of cluster populations
+hist(cluster_n, main = "Histogram of clusters' population",
+                xlab = "Clusters' population", ylab = "Frequency of clusters")
+
+
+#### Clusters ####
+
+# Vector of clusters
+
+cluster_no <- seq(1:C)
+
+# Vaccination status of clusters
+
+V <- C*p_clusvax                                           # Number of clusters in the vaccine group
+cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+
+
+# Cluster map
+# Random location of clusters (cannot be in order, we vax the first proportion)
+
+cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
+                      dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+
+# Cluster distance matrix
+
+cluster_dis <- matrix(1, nrow = C, ncol = C,
+                      dimnames = list(seq(1:C), seq(1:C)))
+
+for (i in 1:C) {                          # Each cluster distance
+  for (j in 1:C) {                        # with each of the others
+    
+    for (k in 1:sqrt(C)) {                # Look for location of first cluster
+      for (l in 1:sqrt(C)) {
+        if (i == cluster_map[k, l]) {
+          
+          for (m in 1:sqrt(C)) {          # Look for location of second cluster
+            for (n in 1:sqrt(C)) {
+              if (j == cluster_map[m, n]) {
+                
+                # Function to get the distance
+                
+                vertical <- abs(m - k)
+                horizontal <- abs(n - l)
+                distance <- sqrt(horizontal^2 + vertical^2)
+  
+                cluster_dis[i, j] <- round(distance, digits = 3)
+              }
+            }
+          }
+          
+        }
+      }
+    }
+    
+  }
+}
+diag(cluster_dis) <- 1
+
+# Network object
+
+cluster_network <- as.network(x = cluster_dis,
+                             directed = FALSE,
+                             loops = FALSE,
+                             matrix.type = "adjacency"
+)
+set.vertex.attribute(cluster_network,"Number", cluster_no)
+set.vertex.attribute(cluster_network,"Vaccine", cluster_vstatus)
+set.vertex.attribute(cluster_network,"Pop", cluster_n)
+# Cluster(node) level attribute (let's put the number, pop and vax status)
+edge_values <- as.numeric(1/cluster_dis)
+set.edge.value(cluster_network, "Distance", edge_values)
+# Edge(connection) level attribute (inversely proportion to distance)
+
+summary.network(cluster_network,print.adj = FALSE)
+
+
 
 # FUNCTION ----------------------------------------------------------------
 
 
-sir_model <- function(N, C, cluster_n, cluster_dis,
-                      number_infected, R0, dur_inf, imp_rate,
+sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
+                      incidence, R0, dur_inf, imp_rate,
                       p_vax, p_clusvax, vax_eff,
                       p_sym, p_test, p_positive,
                       time_step, years) {
@@ -159,19 +175,18 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   
   # Calculated parameters
   
-  beta <- R0/dur_inf                                    # Force of infection
+  beta <- R0/dur_inf                    # Force of infection
   
-  mu <- p_sym*p_test*p_positive                         # Prob of detecting I
+  mu <- p_sym*p_test*p_positive         # Prob of detecting I
   
   
   # Cluster vectors
 
-  cluster_no <- seq(1:C)                                      # Vector of clusters
+  cluster_no <- cluster_no              # Vector of clusters
   
-  cluster_n <- cluster_n                                      # Vector of cluster populations
+  cluster_n <- cluster_n                # Vector of cluster populations
   
-  V <- C*p_clusvax                                           # Number of clusters in the vaccine group
-  cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+  cluster_vstatus <- cluster_vstatus    # Flag for vax clusters
   
   ## Data frame for reference
   
@@ -188,18 +203,14 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   ## Basic cluster indications
   
   cluster <- rep(0, times = length(time_seq))
-  
   v_cluster <- rep(0, times = length(time_seq))
-  
   #time_seq is the third col
   
   ## SIR model compartments
   
   no_N <- as.integer(rep(0, times = length(time_seq)))     # Total n per cluster
-  
   no_S <- as.integer(rep(0, times = length(time_seq)))     # Susceptible 
   no_V <- as.integer(rep(0, times = length(time_seq)))     # Vaccinated  
-  
   no_I <- as.integer(rep(0, times = length(time_seq)))     # Infected
   no_R <- as.integer(rep(0, times = length(time_seq)))     # Recovered
   
@@ -210,16 +221,14 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   
   ##  Probabilities: 1 - exp(hazard)
   
-  lambda <- rep(0, times = length(time_seq))
-  lambda_v <- rep(0, times = length(time_seq))
-  
-  sigma <- rep(0, times = length(time_seq))
+  prob_SI <- rep(0, times = length(time_seq))
+  prob_VI <- rep(0, times = length(time_seq))
+  prob_IR <- rep(0, times = length(time_seq))
   
   # State variables: incidence/recovery
   
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
   inc_VI <- as.integer(rep(0, times = length(time_seq)))
-  
   rec_IR <- as.integer(rep(0, times = length(time_seq)))
   
   
@@ -232,13 +241,13 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   names_column <- c("cluster", "vaccine", "time_seq",
                     "no_N", "no_S", "no_V", "no_I", "no_R",
                     "haz_inf", "haz_rec",
-                    "lambda", "lambda_v", "sigma",
+                    "prob_SI", "prob_VI", "prob_IR",
                     "inc_SI", "inc_VI", "rec_IR")
   
   names_matrix <- paste0("cluster_", cluster_no)
   
   sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, haz_rec,lambda, lambda_v, sigma, inc_SI, inc_VI, rec_IR),
+                 haz_inf, haz_rec,prob_SI, prob_VI, prob_IR, inc_SI, inc_VI, rec_IR),
                dim = c(length(time_seq), 16, C),
                dimnames = list(names_row, names_column, names_matrix))
   
@@ -253,7 +262,7 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
   
   # I an R
   for (i in 1:C) {
-    sir[, 7, i] = number_infected
+    sir[, 7, i] = round(incidence*sir[, 4, i], digits = 0)
     sir[, 8, i] = 0
   }
   
@@ -284,11 +293,8 @@ sir_model <- function(N, C, cluster_n, cluster_dis,
         
         if (k != j) {
           
-          if (cluster_dis[k, j] != 0) { # Add FOI for the clusters that are close to each other only
-            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
-          }
+          sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
         }
-        
       }
       sir[i, 10, j] = 1/dur_inf
       
