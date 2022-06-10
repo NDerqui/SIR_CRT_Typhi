@@ -38,7 +38,7 @@ incidence <- 0.005492 # 549.2 cases per 100,000
 # The World Bank Data 2020
 
 # birth <- 0.017      # 17 per 1,000
-birth <- 0.007
+birth <- 0.017
 
 # Death rate
 # The World Bank Data 2020
@@ -306,19 +306,19 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
       # From I to R
       
       sir[i, 11, j] = 1/dur_inf
-      sir[i, 12, j] = (1 - exp(-sir[i, 11, j])*time_step)  
+      sir[i, 12, j] = (1 - exp(-sir[i, 11, j]*time_step))  
       sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0) 
       
       # Deaths
       
       sir[i, 14, j] = death
-      sir[i, 15, j] = (1 - exp(-sir[i, 14, j])*time_step)  
+      sir[i, 15, j] = (1 - exp(-sir[i, 14, j]*time_step))  
       sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 15, j]), digits = 0) 
       
       # Births
       
       sir[i, 17, j] = birth
-      sir[i, 18, j] = (1 - exp(-sir[i, 17, j])*time_step)  
+      sir[i, 18, j] = (1 - exp(-sir[i, 17, j]*time_step))  
       sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 18, j]), digits = 0) 
       
       # Model equations
@@ -385,6 +385,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
                       R0, dur_inf, imp_rate,
                       p_vax, p_clusvax, vax_eff,
                       p_sym, p_test, p_positive,
+                      birth, death,
                       time_step, years, equilibrium_result) {
 
   
@@ -433,18 +434,25 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   
   haz_inf <- rep(0, times = length(time_seq))
   haz_rec <- rep(0, times = length(time_seq))
+  haz_dea <- rep(0, times = length(time_seq))
+  haz_bir <- rep(0, times = length(time_seq))
   
   ##  Probabilities: 1 - exp(hazard)
   
   prob_SI <- rep(0, times = length(time_seq))
   prob_VI <- rep(0, times = length(time_seq))
   prob_IR <- rep(0, times = length(time_seq))
+  prob_B <- rep(0, times = length(time_seq))
+  prob_D <- rep(0, times = length(time_seq))
   
   ## State variables: incidence/recovery
   
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
   inc_VI <- as.integer(rep(0, times = length(time_seq)))
   inc_IR <- as.integer(rep(0, times = length(time_seq)))
+  inc_SD <- as.integer(rep(0, times = length(time_seq)))
+  inc_VD <- as.integer(rep(0, times = length(time_seq)))
+  inc_Bx <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -454,13 +462,15 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   names_row <- paste0("t_", time_seq)
   names_column <- c("cluster", "vaccine", "time_seq",
                     "no_N", "no_S", "no_V", "no_I", "no_R",
-                    "haz_inf", "haz_rec",
-                    "prob_SI", "prob_VI", "prob_IR",
-                    "inc_SI", "inc_VI", "inc_IR")
+                    "haz_inf", "prob_SI", "prob_VI", "inc_SI", "inc_VI",
+                    "haz_rec", "prob_IR", "inc_IR",
+                    "haz_dea", "prob_D", "inc_SD", "inc_VD",
+                    "haz_bir", "prob_B", "inc_Bx")
   names_matrix <- paste0("cluster_", cluster_no)
   sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, haz_rec,prob_SI, prob_VI, prob_IR, inc_SI, inc_VI, inc_IR),
-               dim = c(length(time_seq), 16, C),
+                 haz_inf, prob_SI, prob_VI, inc_SI, inc_VI, haz_rec, prob_IR, inc_IR,
+                 haz_dea, prob_D, inc_SD, inc_VD, haz_bir, prob_B, inc_Bx),
+               dim = c(length(time_seq), 23, C),
                dimnames = list(names_row, names_column, names_matrix))
   
   ## Assign initial values
@@ -482,9 +492,9 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
       sir[, 5, i] = round(equilibrium_result[i, 5]*(1 - p_vax), digits = 0) # Susceptible (non-vax)
       sir[, 6, i] = round(equilibrium_result[i, 5]*p_vax, digits = 0)       # Vaccinated
       
-    } else {                                                       # In non-vax clusters
+    } else {                                                      # In non-vax clusters
       sir[, 5, i] = round(equilibrium_result[i, 5], digits = 0)   # Susceptible (non-vax)
-      sir[, 6, i] = as.integer(0)                                  # Vaccinated
+      sir[, 6, i] = as.integer(0)                                 # Vaccinated
     }
   }
   
@@ -495,30 +505,47 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
     
     for (i in 2:length(time_seq)) {
       
-      # Hazards
+      # From S to I
+      
       sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
       for (k in 1:C) { # Loop to add external FOI
        if (k != j) {
           sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
         }
       }
-      sir[i, 10, j] = 1/dur_inf
+      sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
+      sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
       
-      # Probabilities
-      sir[i, 11, j] = (1 - exp(-sir[i, 9, j]*time_step))
+      # From V to I
+      
       sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
-      sir[i, 13, j] = (1 - exp(-sir[i, 10, j])*time_step)  
+      sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0)
       
-      # State variables
-      sir[i, 14, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 11, j]), digits = 0)
-      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0)
-      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 13, j]), digits = 0)  
+      # From I to R
+      
+      sir[i, 14, j] = 1/dur_inf
+      sir[i, 15, j] = (1 - exp(-sir[i, 14, j])*time_step)  
+      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 15, j]), digits = 0)  
+      
+      # Deaths
+      
+      sir[i, 17, j] = death
+      sir[i, 18, j] = (1 - exp(-sir[i, 17, j])*time_step)  
+      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 18, j]), digits = 0) 
+      sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 18, j]), digits = 0) 
+      
+      # Births
+      
+      sir[i, 21, j] = birth
+      sir[i, 22, j] = (1 - exp(-sir[i, 21, j])*time_step)  
+      sir[i, 23, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 22, j]), digits = 0) 
+      
       
       # Model equations
-      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 14, j]
-      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 15, j]
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 19, j] + round(sir[i, 23, j]*(1-p_vax), digits = 0)
+      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 20, j] + round(sir[i, 23, j]*(p_vax), digits = 0)
       
-      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 14, j] + sir[i, 15, j] - sir[i, 16, j]
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 16, j]
       
       sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 16, j]
     }
@@ -551,7 +578,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   colnames(sir_res_inc_SI) <- names_matrix
   
   for (i in 1:C) {
-    sir_res_inc_SI[,i] <- sir[,14,i]
+    sir_res_inc_SI[,i] <- sir[,11,i]
   }
   
   ## Incidence of infection from V
@@ -560,7 +587,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   colnames(sir_res_inc_VI) <- names_matrix
   
   for (i in 1:C) {
-    sir_res_inc_VI[,i] <- sir[,15,i]
+    sir_res_inc_VI[,i] <- sir[,13,i]
   }
   
   ## Pivot the results and merge all together
@@ -939,6 +966,10 @@ dev.off()
 
 # With these characteristics
 
+R0
+p_vax <- 0.95
+vax_eff
+
 
 #### Run simulations ####
 
@@ -961,6 +992,7 @@ test <- sir_many(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
                 R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
                 p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
                 p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                birth = birth, death = death,
                 time_step = time_step, years = 1,
                 equilibrium_result = result_equilibrium, n_runs = 10)
 
@@ -984,20 +1016,25 @@ overall_effect <- sir_overall(summary_sir, n_runs = 10)
 
 # Give name to simulation
 
-dir.create(here("Results/2step_simulation/Name"),recursive = TRUE)
+dir.create(here("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8"),recursive = TRUE)
 
 # Save
 
-png("Results/2step_simulation/Name/SIR_overall.png",
-    width = 18, height = 12, units = 'in', res = 600)
+png("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/SIR_equilibrium.png",
+    width = 20, height = 12, units = 'in', res = 600)
+equilibrium[[1]]
+dev.off()
+
+png("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/SIR_after_vax.png",
+    width = 20, height = 12, units = 'in', res = 600)
 plot_sir
 dev.off()
 
 write.xlsx(as.data.frame(direct_effect), rowNames = TRUE,
-           "Results/2step_simulation/Name/Direct_Effect.xlsx")
+           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Direct_Effect.xlsx")
 write.xlsx(as.data.frame(indirect_effect), rowNames = TRUE,
-           "Results/2step_simulation/Name/Indirect_Effect.xlsx")
+           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Indirect_Effect.xlsx")
 write.xlsx(as.data.frame(total_effect), rowNames = TRUE,
-           "Results/2step_simulation/Name/Total_Effect.xlsx")
+           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Total_Effect.xlsx")
 write.xlsx(as.data.frame(overall_effect), rowNames = TRUE,
-           "Results/2step_simulation/Name/Overall_Effect.xlsx")
+           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Overall_Effect.xlsx")
