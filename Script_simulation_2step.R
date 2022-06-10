@@ -945,7 +945,7 @@ dev.off()
 # With these characteristics
 
 R0
-p_vax 
+p_vax <- 0.95
 vax_eff
 
 
@@ -994,25 +994,27 @@ overall_effect <- sir_overall(summary_sir, n_runs = 10)
 
 # Give name to simulation
 
-dir.create(here("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8"),recursive = TRUE)
+characteristics <- "R0=2 Cover=0.95 VE=0.8"
+
+dir.create(here(paste0("Results/2step_simulation/", characteristics)),recursive = TRUE)
 
 # Save
 
-png("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/SIR_equilibrium.png",
+png(paste0("Results/2step_simulation/", characteristics,"/SIR_equilibrium.png"),
     width = 20, height = 12, units = 'in', res = 600)
 equilibrium[[1]]
 dev.off()
 
-png("Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/SIR_after_vax.png",
+png(paste0("Results/2step_simulation/", characteristics,"/SIR_after_vax.png"),
     width = 20, height = 12, units = 'in', res = 600)
 plot_sir
 dev.off()
 
 write.xlsx(as.data.frame(direct_effect), rowNames = TRUE,
-           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Direct_Effect.xlsx")
+           paste0("Results/2step_simulation/", characteristics,"/Direct_Effect.xlsx"))
 write.xlsx(as.data.frame(indirect_effect), rowNames = TRUE,
-           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Indirect_Effect.xlsx")
+           paste0("Results/2step_simulation/", characteristics,"/Indirect_Effect.xlsx"))
 write.xlsx(as.data.frame(total_effect), rowNames = TRUE,
-           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Total_Effect.xlsx")
+           paste0("Results/2step_simulation/", characteristics,"/Total_Effect.xlsx"))
 write.xlsx(as.data.frame(overall_effect), rowNames = TRUE,
-           "Results/2step_simulation/R0=2 Cover=0.95 VE=0.8/Overall_Effect.xlsx")
+           paste0("Results/2step_simulation/", characteristics,"/Overall_Effect.xlsx"))
