@@ -225,7 +225,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   prob_VI <- rep(0, times = length(time_seq))
   prob_IR <- rep(0, times = length(time_seq))
   
-  # State variables: incidence/recovery
+  ## State variables: incidence/recovery
   
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
   inc_VI <- as.integer(rep(0, times = length(time_seq)))
