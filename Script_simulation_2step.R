@@ -414,17 +414,14 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   ## Hazards 
   
   haz_inf <- rep(0, times = length(time_seq))
-  haz_rec <- rep(0, times = length(time_seq))
-  haz_dea <- rep(0, times = length(time_seq))
-  haz_bir <- rep(0, times = length(time_seq))
   
   ##  Probabilities: 1 - exp(hazard)
   
-  prob_SI <- rep(0, times = length(time_seq))
-  prob_VI <- rep(0, times = length(time_seq))
-  prob_IR <- rep(0, times = length(time_seq))
-  prob_B <- rep(0, times = length(time_seq))
-  prob_D <- rep(0, times = length(time_seq))
+  prob_infec <- rep(0, times = length(time_seq))
+  prob_vaxin <- rep(0, times = length(time_seq))
+  prob_recov <- rep(0, times = length(time_seq))
+  prob_death <- rep(0, times = length(time_seq))
+  prob_birth <- rep(0, times = length(time_seq))
   
   ## State variables: incidence/recovery
   
@@ -433,7 +430,9 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   inc_IR <- as.integer(rep(0, times = length(time_seq)))
   inc_SD <- as.integer(rep(0, times = length(time_seq)))
   inc_VD <- as.integer(rep(0, times = length(time_seq)))
-  inc_Bx <- as.integer(rep(0, times = length(time_seq)))
+  inc_ID <- as.integer(rep(0, times = length(time_seq)))
+  inc_RD <- as.integer(rep(0, times = length(time_seq)))
+  inc_NB <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -443,15 +442,15 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   names_row <- paste0("t_", time_seq)
   names_column <- c("cluster", "vaccine", "time_seq",
                     "no_N", "no_S", "no_V", "no_I", "no_R",
-                    "haz_inf", "prob_SI", "prob_VI", "inc_SI", "inc_VI",
-                    "haz_rec", "prob_IR", "inc_IR",
-                    "haz_dea", "prob_D", "inc_SD", "inc_VD",
-                    "haz_bir", "prob_B", "inc_Bx")
+                    "haz_inf", "prob_infec", "inc_SI", "prob_vaxin", "inc_VI",
+                    "prob_recov", "inc_IR",
+                    "prob_death", "inc_SD", "inc_VD", "inc_ID", "inc_RD",
+                    "prob_birth", "inc_NB")
   names_matrix <- paste0("cluster_", cluster_no)
   sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, prob_SI, prob_VI, inc_SI, inc_VI, haz_rec, prob_IR, inc_IR,
-                 haz_dea, prob_D, inc_SD, inc_VD, haz_bir, prob_B, inc_Bx),
-               dim = c(length(time_seq), 23, C),
+                 haz_inf, prob_infec, inc_SI, prob_vaxin, inc_VI, prob_recov, inc_IR,
+                 prob_death, inc_SD, inc_VD, inc_ID, inc_RD, prob_birth, inc_NB),
+               dim = c(length(time_seq), 22, C),
                dimnames = list(names_row, names_column, names_matrix))
   
   ## Assign initial values
@@ -460,7 +459,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   for (i in 1:C) {
     sir[, 1, i] = cluster_no[i]
     sir[, 2, i] = cluster_vstatus[i]
-    sir[, 4, i] = cluster_n[i]
+    sir[, 4, i] = equilibrium_result[i, 4]
   }
   # I an R
   for (i in 1:C) {
@@ -473,9 +472,9 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
       sir[, 5, i] = round(equilibrium_result[i, 5]*(1 - p_vax), digits = 0) # Susceptible (non-vax)
       sir[, 6, i] = round(equilibrium_result[i, 5]*p_vax, digits = 0)       # Vaccinated
       
-    } else {                                                      # In non-vax clusters
-      sir[, 5, i] = round(equilibrium_result[i, 5], digits = 0)   # Susceptible (non-vax)
-      sir[, 6, i] = as.integer(0)                                 # Vaccinated
+    } else {                                   # In non-vax clusters
+      sir[, 5, i] = equilibrium_result[i, 5]   # Susceptible (non-vax)
+      sir[, 6, i] = as.integer(0)              # Vaccinated
     }
   }
   
@@ -504,31 +503,29 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
       
       # From I to R
       
-      sir[i, 14, j] = 1/dur_inf
-      sir[i, 15, j] = (1 - exp(-sir[i, 14, j]*time_step))  
-      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 15, j]), digits = 0)  
+      sir[i, 14, j] = (1 - exp(-(1/dur_inf)*time_step))  
+      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j]), digits = 0)  
       
       # Deaths
       
-      sir[i, 17, j] = death
-      sir[i, 18, j] = (1 - exp(-sir[i, 17, j]*time_step))  
-      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 18, j]), digits = 0) 
-      sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 18, j]), digits = 0) 
+      sir[i, 16, j] = (1 - exp(-death*time_step))  
+      sir[i, 17, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j]), digits = 0) 
+      sir[i, 18, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j]), digits = 0) 
+      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j]), digits = 0) 
+      sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j]), digits = 0) 
       
       # Births
       
-      sir[i, 21, j] = birth
-      sir[i, 22, j] = (1 - exp(-sir[i, 21, j]*time_step))  
-      sir[i, 23, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 22, j]), digits = 0) 
-      
+      sir[i, 21, j] = (1 - exp(-birth*time_step))  
+      sir[i, 22, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j]), digits = 0) 
       
       # Model equations
-      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 19, j] + round(sir[i, 23, j]*(1-p_vax), digits = 0)
-      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 20, j] + round(sir[i, 23, j]*(p_vax), digits = 0)
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + round(sir[i, 22, j]*(1-p_vax), digits = 0)
+      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + round(sir[i, 22, j]*(p_vax), digits = 0)
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]
+      sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]
+      sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
       
-      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 16, j]
-      
-      sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 16, j]
     }
   }
   
@@ -948,7 +945,7 @@ dev.off()
 # With these characteristics
 
 R0
-p_vax <- 0.95
+p_vax 
 vax_eff
 
 
