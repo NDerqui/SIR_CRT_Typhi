@@ -17,7 +17,6 @@ library(tidyverse)
 library(sandwich)
 library(lmtest)
 library(statnet)
-library(ggnet)
 
 
 
@@ -38,7 +37,7 @@ incidence <- 0.005492 # 549.2 cases per 100,000
 # The World Bank Data 2020
 
 # birth <- 0.017      # 17 per 1,000
-birth <- 0.017
+birth <- 0.007
 
 # Death rate
 # The World Bank Data 2020
@@ -208,41 +207,25 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
   no_I <- as.integer(rep(0, times = length(time_seq)))     # Infected 
   no_R <- as.integer(rep(0, times = length(time_seq)))     # Recovered
   
-  ## From S to I
+  ## Hazards 
   
-  # Hazard
   haz_inf <- rep(0, times = length(time_seq))
-  # Probability: 1 - exp(hazard)
+
+  ##  Probabilities: 1 - exp(hazard)
+  
   prob_infec <- rep(0, times = length(time_seq))
-  # State variables
-  inc_SI <- as.integer(rep(0, times = length(time_seq)))
-  
-  ## From I to R
-  
-  # Hazard
-  haz_rec <- rep(0, times = length(time_seq))
-  # Probability: 1 - exp(hazard)
   prob_recov <- rep(0, times = length(time_seq))
-  # State variable
-  inc_IR <- as.integer(rep(0, times = length(time_seq)))
-  
-  ## Deaths
-  
-  # Hazard
-  haz_dea <- rep(0, times = length(time_seq))
-  # Probability: 1 - exp(hazard)
   prob_death <- rep(0, times = length(time_seq))
-  # State variable
-  inc_SD <- as.integer(rep(0, times = length(time_seq)))
-  
-  ## Births
-  
-  # Hazard
-  haz_bir <- rep(0, times = length(time_seq))
-  # Probability: 1 -exp(hazard)
   prob_birth <- rep(0, times = length(time_seq))
-  # State variable
-  inc_BS <- as.integer(rep(0, times = length(time_seq)))
+  
+  ## State variables: incidence/recovery
+  
+  inc_SI <- as.integer(rep(0, times = length(time_seq)))
+  inc_IR <- as.integer(rep(0, times = length(time_seq)))
+  inc_SD <- as.integer(rep(0, times = length(time_seq)))
+  inc_ID <- as.integer(rep(0, times = length(time_seq)))
+  inc_RD <- as.integer(rep(0, times = length(time_seq)))
+  inc_NB <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -254,19 +237,19 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
   names_column <- c("cluster", "vax_status", "time_seq", 
                     "no_N", "no_S", "no_I", "no_R",
                     "haz_inf","prob_infec", "inc_SI",
-                    "haz_rec", "prob_recov", "inc_IR",
-                    "haz_dea", "prob_death", "inc_SD",
-                    "haz_bir", "prob_birth", "inc_BS")
+                    "prob_recov", "inc_IR",
+                    "prob_death", "inc_SD", "inc_ID", "inc_RD",
+                    "prob_birth", "inc_NB")
   
   names_matrix <- paste0("cluster_", cluster_no)
   
   sir <- array(c(cluster, v_cluster, time_seq,
                  no_N, no_S, no_I, no_R,
                  haz_inf, prob_infec, inc_SI,
-                 haz_rec, prob_recov, inc_IR,
-                 haz_dea, prob_death, inc_SD,
-                 haz_bir, prob_birth, inc_BS),
-               dim = c(length(time_seq), 19, C),
+                 prob_recov, inc_IR,
+                 prob_death, inc_SD, inc_ID, inc_RD,
+                 prob_birth, inc_NB),
+               dim = c(length(time_seq), 18, C),
                dimnames = list(names_row, names_column, names_matrix))
   
   ## Assign initial values
@@ -299,33 +282,31 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
           sir[i, 8, j] = sir[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 6, k]/sir[i-1, 4 ,k] 
         }
       }
-      
       sir[i, 9, j] = (1 - exp(-sir[i, 8, j]*time_step))
       sir[i, 10, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 9, j]), digits = 0)
       
       # From I to R
       
-      sir[i, 11, j] = 1/dur_inf
-      sir[i, 12, j] = (1 - exp(-sir[i, 11, j]*time_step))  
-      sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0) 
+      sir[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
+      sir[i, 12, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 11, j]), digits = 0) 
       
       # Deaths
       
-      sir[i, 14, j] = death
-      sir[i, 15, j] = (1 - exp(-sir[i, 14, j]*time_step))  
-      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 15, j]), digits = 0) 
+      sir[i, 13, j] = (1 - exp(-death*time_step))  
+      sir[i, 14, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 13, j]), digits = 0) 
+      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 13, j]), digits = 0) 
+      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 13, j]), digits = 0) 
       
       # Births
       
-      sir[i, 17, j] = birth
-      sir[i, 18, j] = (1 - exp(-sir[i, 17, j]*time_step))  
-      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 18, j]), digits = 0) 
+      sir[i, 17, j] = (1 - exp(-birth*time_step))  
+      sir[i, 18, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 17, j]), digits = 0) 
       
       # Model equations
-      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 10, j] - sir[i, 16, j] + sir[i, 19, j]
-      sir[i, 6, j] = sir[i-1, 6, j] + sir[i, 10, j] - sir[i, 13, j]
-      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 13, j]
-      #sir[i, 4, j] = sir[i-1, 4, j] - sir[i, 16, j] + sir[i, 19, j]
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 10, j] - sir[i, 14, j] + sir[i, 18, j]
+      sir[i, 6, j] = sir[i-1, 6, j] + sir[i, 10, j] - sir[i, 12, j] - sir[i, 15, j]
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 12, j] - sir[i, 16, j]
+      sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j]
       
     }
   }
@@ -362,7 +343,7 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
   
   ## Input for the vaccine simulation
   
-  sir_result <- as.data.frame(matrix(0, nrow = C, ncol = 19))
+  sir_result <- as.data.frame(matrix(0, nrow = C, ncol = 18))
   colnames(sir_result) <- names_column
   for (i in 1:C) {
     sir_result[i,] <- sir[length(time_seq),,i]         
@@ -524,20 +505,20 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
       # From I to R
       
       sir[i, 14, j] = 1/dur_inf
-      sir[i, 15, j] = (1 - exp(-sir[i, 14, j])*time_step)  
+      sir[i, 15, j] = (1 - exp(-sir[i, 14, j]*time_step))  
       sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 15, j]), digits = 0)  
       
       # Deaths
       
       sir[i, 17, j] = death
-      sir[i, 18, j] = (1 - exp(-sir[i, 17, j])*time_step)  
+      sir[i, 18, j] = (1 - exp(-sir[i, 17, j]*time_step))  
       sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 18, j]), digits = 0) 
       sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 18, j]), digits = 0) 
       
       # Births
       
       sir[i, 21, j] = birth
-      sir[i, 22, j] = (1 - exp(-sir[i, 21, j])*time_step)  
+      sir[i, 22, j] = (1 - exp(-sir[i, 21, j]*time_step))  
       sir[i, 23, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 22, j]), digits = 0) 
       
       
