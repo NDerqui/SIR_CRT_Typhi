@@ -173,7 +173,8 @@ summary.network(cluster_network,print.adj = FALSE)
 # Results will be used as starting point for the CRT simulation
 
 equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
-                        incidence, R0, dur_inf, imp_rate,
+                        incidence, birth, death,
+                        R0, dur_inf, imp_rate,
                         time_step, years) {
   
   
@@ -332,17 +333,45 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
   
   # Store the results
   
+  ## Graph to check
+  
+  sir_result_graph <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_result_graph) <- names_matrix
+  for (i in 1:C) {
+    sir_result_graph[,i] <- sir[,6,i]
+  }
+
+  sir_result_graph <- sir_result_graph %>%
+    mutate(time_seq = time_seq) %>%
+    pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
+    mutate(num_cluster = readr::parse_number(cluster)) %>%
+    arrange(num_cluster)
+  
+  plot <- ggplot(data = sir_result_graph) +
+    geom_line(mapping = aes(x = time_seq, y = infected, group = num_cluster),
+              color = "firebrick") +
+    theme_classic() +
+    labs(title = "Incidence over time",
+         x = paste0("Time over ", years, " years (days)"),
+         y = "Number of infections") +
+    theme(
+      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
+      axis.title.x = element_text(size = rel(1.1), face="bold"),
+      axis.title.y = element_text(size = rel(1.1), face="bold"),
+      axis.text = element_text(size=rel(1)))
+  
+  ## Input for the vaccine simulation
+  
   sir_result <- as.data.frame(matrix(0, nrow = C, ncol = 19))
-  
-  ## Last row of array
-  
+  colnames(sir_result) <- names_column
   for (i in 1:C) {
     sir_result[i,] <- sir[length(time_seq),,i]         
   }
   
   ## Returned object
   
-  sir_result
+  sir_list <- list(plot, sir_result)
+  
 }
 
 
@@ -352,11 +381,11 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
 
 #### Main functions ####
 
-sis_model <- function(N, C, cluster_n, cluster_dis,
+sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
                       R0, dur_inf, imp_rate,
                       p_vax, p_clusvax, vax_eff,
                       p_sym, p_test, p_positive,
-                      time_step, years, equilibrium) {
+                      time_step, years, equilibrium_result) {
 
   
   time_seq <- seq(from = 1, to = 365*years, by = time_step) # Total time   
@@ -364,16 +393,15 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   
   # Calculated parameters
   
-  beta <- R0/dur_inf                                    # Force of infection
-  mu <- p_sym*p_test*p_positive                         # Prob of detecting I
+  beta <- R0/dur_inf                  # Force of infection
+  mu <- p_sym*p_test*p_positive       # Prob of detecting I
   
   
   # Cluster vectors
 
-  cluster_no <- seq(1:C)                                     # Vector of clusters
-  cluster_n <- cluster_n                                     # Vector of cluster populations
-  V <- C*p_clusvax                                           # Number of clusters in the vaccine group
-  cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+  cluster_no <- cluster_no            # Vector of clusters
+  cluster_n <- cluster_n              # Vector of cluster populations
+  cluster_vstatus <- cluster_vstatus  # Flag for vax clusters
   
   ## Data frame for reference
   
@@ -393,7 +421,7 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   v_cluster <- rep(0, times = length(time_seq))
   #time_seq is the third col
   
-  ## SIS model compartments
+  ## SIR model compartments
   
   no_N <- as.integer(rep(0, times = length(time_seq)))     # Total n per cluster
   no_S <- as.integer(rep(0, times = length(time_seq)))     # Susceptible 
@@ -408,15 +436,15 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   
   ##  Probabilities: 1 - exp(hazard)
   
-  lambda <- rep(0, times = length(time_seq))
-  lambda_v <- rep(0, times = length(time_seq))
-  sigma <- rep(0, times = length(time_seq))
+  prob_SI <- rep(0, times = length(time_seq))
+  prob_VI <- rep(0, times = length(time_seq))
+  prob_IR <- rep(0, times = length(time_seq))
   
   ## State variables: incidence/recovery
   
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
   inc_VI <- as.integer(rep(0, times = length(time_seq)))
-  rec_IR <- as.integer(rep(0, times = length(time_seq)))
+  inc_IR <- as.integer(rep(0, times = length(time_seq)))
   
   
   # Build the array
@@ -427,11 +455,11 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   names_column <- c("cluster", "vaccine", "time_seq",
                     "no_N", "no_S", "no_V", "no_I", "no_R",
                     "haz_inf", "haz_rec",
-                    "lambda", "lambda_v", "sigma",
-                    "inc_SI", "inc_VI", "rec_IR")
+                    "prob_SI", "prob_VI", "prob_IR",
+                    "inc_SI", "inc_VI", "inc_IR")
   names_matrix <- paste0("cluster_", cluster_no)
-  sis <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, haz_rec,lambda, lambda_v, sigma, inc_SI, inc_VI, rec_IR),
+  sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
+                 haz_inf, haz_rec,prob_SI, prob_VI, prob_IR, inc_SI, inc_VI, inc_IR),
                dim = c(length(time_seq), 16, C),
                dimnames = list(names_row, names_column, names_matrix))
   
@@ -439,60 +467,60 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   
   # Cluster number, vaccine status and no_N
   for (i in 1:C) {
-    sis[, 1, i] = cluster_no[i]
-    sis[, 2, i] = cluster_vstatus[i]
-    sis[, 4, i] = cluster_n[i]
+    sir[, 1, i] = cluster_no[i]
+    sir[, 2, i] = cluster_vstatus[i]
+    sir[, 4, i] = cluster_n[i]
   }
   # I an R
   for (i in 1:C) {
-    sis[, 7, i] = equilibrium[i, 7]
-    sis[, 8, i] = 0
+    sir[, 7, i] = equilibrium_result[i, 6]
+    sir[, 8, i] = equilibrium_result[i, 7]
   }
-  # S and V population - depends on vaccination cluster status and coverage
+  # S and V population - depends on vaccination cluster status
   for (i in 1:C) {
-    if (sis[1, 2, i] == 1) {                                                 # In vaccinated clusters
-      sis[, 5, i] = round((sis[, 4 ,i]-sis[, 7, i])*(1 - p_vax), digits = 0) # Susceptible (non-vax)
-      sis[, 6, i] = round((sis[, 4 ,i]-sis[, 7, i])*p_vax, digits = 0)       # Vaccinated
+    if (sir[1, 2, i] == 1) {                                                # In vaccinated clusters
+      sir[, 5, i] = round(equilibrium_result[i, 5]*(1 - p_vax), digits = 0) # Susceptible (non-vax)
+      sir[, 6, i] = round(equilibrium_result[i, 5]*p_vax, digits = 0)       # Vaccinated
       
     } else {                                                       # In non-vax clusters
-      sis[, 5, i] = round((sis[, 4 ,i]-sis[, 7, i]), digits = 0)   # Susceptible (non-vax)
-      sis[, 6, i] = as.integer(0)                                  # Vaccinated
+      sir[, 5, i] = round(equilibrium_result[i, 5], digits = 0)   # Susceptible (non-vax)
+      sir[, 6, i] = as.integer(0)                                  # Vaccinated
     }
   }
   
 
   # Put the model to run
-    
+  
   for (j in 1:C) {
     
     for (i in 2:length(time_seq)) {
       
       # Hazards
-      sis[i, 9, j] = beta*sis[i-1, 7, j]/sis[i-1, 4 ,j]
+      sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
       for (k in 1:C) { # Loop to add external FOI
-        
-        if (k != j) {
-          sis[i, 9, j] = sis[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sis[i-1, 7, k]/sis[i-1, 4 ,k]
+       if (k != j) {
+          sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
         }
       }
-      sis[i, 10, j] = 1/dur_inf
+      sir[i, 10, j] = 1/dur_inf
       
       # Probabilities
-      sis[i, 11, j] = (1 - exp(-sis[i, 9, j]*time_step))
-      sis[i, 12, j] = (1 - exp(-sis[i, 9, j]*(1 - vax_eff)*time_step))
-      sis[i, 13, j] = (1 - exp(-sis[i, 10, j])*time_step)  
+      sir[i, 11, j] = (1 - exp(-sir[i, 9, j]*time_step))
+      sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
+      sir[i, 13, j] = (1 - exp(-sir[i, 10, j])*time_step)  
       
       # State variables
-      sis[i, 14, j] = round(rbinom(n = 1, size = sis[i-1, 5, j], prob = sis[i, 11, j]), digits = 0)
-      sis[i, 15, j] = round(rbinom(n = 1, size = sis[i-1, 6, j], prob = sis[i, 12, j]), digits = 0)
-      sis[i, 16, j] = round(rbinom(n = 1, size = sis[i-1, 7, j], prob = sis[i, 13, j]), digits = 0)  
+      sir[i, 14, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 11, j]), digits = 0)
+      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0)
+      sir[i, 16, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 13, j]), digits = 0)  
       
       # Model equations
-      sis[i, 4, j] = sis[i, 5, j] + sis[i, 6, j] + sis[i, 7, j] + sis[i, 8, j]
-      sis[i, 5, j] = sis[i-1, 5, j] - sis[i, 14, j] + round(sis[i-1, 8, j]*(1 - p_vax), digits = 0)
-      sis[i, 6, j] = sis[i-1, 6, j] - sis[i, 15, j] + round(sis[i-1, 8, j]*p_vax, digits = 0)
-      sis[i, 7, j] = sis[i-1, 7, j] + sis[i, 14, j] + sis[i, 15, j] - sis[i, 16, j]
-      sis[i, 8, j] = sis[i-1, 8, j] + sis[i, 16, j] - sis[i-1, 8, j]
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 14, j]
+      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 15, j]
+      
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 14, j] + sir[i, 15, j] - sir[i, 16, j]
+      
+      sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 16, j]
     }
   }
   
@@ -501,39 +529,43 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
   
   ## Infected
   
-  sis_res_infected <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
-  colnames(sis_res_infected) <- names_matrix
+  sir_res_infected <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_infected) <- names_matrix
+  
   for (i in 1:C) {
-    sis_res_infected[,i] <- sis[,7,i]         
+    sir_res_infected[,i] <- sir[,7,i]         
   }
   
   ## Detected infections
   
-  sis_res_observed <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
-  colnames(sis_res_observed) <- names_matrix
+  sir_res_observed <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_observed) <- names_matrix
+  
   for (i in 1:C) {
-    sis_res_observed[,i] <- round(sis[,7,i]*mu, digits = 0)
+    sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0)
   }
   
   ## Incidence of infection from S
   
-  sis_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
-  colnames(sis_res_inc_SI) <- names_matrix
+  sir_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_inc_SI) <- names_matrix
+  
   for (i in 1:C) {
-    sis_res_inc_SI[,i] <- sis[,14,i]
+    sir_res_inc_SI[,i] <- sir[,14,i]
   }
   
   ## Incidence of infection from V
   
-  sis_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
-  colnames(sis_res_inc_VI) <- names_matrix
+  sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq), ncol = C))
+  colnames(sir_res_inc_VI) <- names_matrix
+  
   for (i in 1:C) {
-    sis_res_inc_VI[,i] <- sis[,15,i]
+    sir_res_inc_VI[,i] <- sir[,15,i]
   }
   
   ## Pivot the results and merge all together
   
-  sis_res_infected <- sis_res_infected %>%
+  sir_res_infected <- sir_res_infected %>%
     mutate(time_seq = time_seq) %>%
     pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
     mutate(cluster = readr::parse_number(cluster)) %>%
@@ -541,7 +573,7 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
     merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
     select(c("cluster", "vaccine", "time_seq", "infected"))
   
-  sis_res_observed <- sis_res_observed %>%
+  sir_res_observed <- sir_res_observed %>%
     mutate(time_seq = time_seq) %>%
     pivot_longer(-time_seq, names_to = "cluster", values_to = "observed") %>%
     mutate(cluster = readr::parse_number(cluster)) %>%
@@ -549,7 +581,7 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
     merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
     select(c("cluster", "vaccine", "time_seq", "observed"))
   
-  sis_res_inc_SI <- sis_res_inc_SI %>%
+  sir_res_inc_SI <- sir_res_inc_SI %>%
     mutate(time_seq = time_seq) %>%
     pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_sus_inf") %>%
     mutate(cluster = readr::parse_number(cluster)) %>%
@@ -557,7 +589,7 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
     merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
     select(c("cluster", "vaccine", "time_seq", "inc_sus_inf"))
   
-  sis_res_inc_VI <- sis_res_inc_VI %>%
+  sir_res_inc_VI <- sir_res_inc_VI %>%
     mutate(time_seq = time_seq) %>%
     pivot_longer(-time_seq, names_to = "cluster", values_to = "inc_vax_inf") %>%
     mutate(cluster = readr::parse_number(cluster)) %>%
@@ -565,43 +597,42 @@ sis_model <- function(N, C, cluster_n, cluster_dis,
     merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
     select(c("cluster", "vaccine", "time_seq", "inc_vax_inf"))
   
-  sis_result <- merge(sis_res_infected, sis_res_observed,
+  sir_result <- merge(sir_res_infected, sir_res_observed,
                       by = c("cluster", "vaccine", "time_seq"), all = TRUE)
-  sis_result <- merge(sis_result, sis_res_inc_SI,
+  sir_result <- merge(sir_result, sir_res_inc_SI,
                       by = c("cluster", "vaccine", "time_seq"), all = TRUE)
-  sis_result <- merge(sis_result, sis_res_inc_VI,
+  sir_result <- merge(sir_result, sir_res_inc_VI,
                       by = c("cluster", "vaccine", "time_seq"), all = TRUE)
-  sis_result <- arrange(sis_result, cluster, time_seq)
+  sir_result <- arrange(sir_result, cluster, time_seq)
   
-  ## Returned object
-
-  sis_result
+  
+  # Returned object
+  
+  sir_result
 }
 
 
-# Function to run the SIS several times
+# Function to run the SIR several times
 # Append the results of each run to each other
 
-sis_many <- function(..., n_runs) {
+sir_many <- function(..., n_runs) {
   
   # Generate output vector
   
-  sis_result <- sis_model(...)
-  sis_result <- sis_result %>%
+  sir_result <- sir_model(...)
+  sir_result <- sir_result %>%
     mutate(run = 1)
-  sis_output <- sis_result
+  sir_output <- sir_result
   
   for (i in 2:n_runs) {
     
     # Get result of one run
-    
-    sis_result <- sis_model(...)
-    sis_result <- sis_result %>%
+    sir_result <- sir_model(...)
+    sir_result <- sir_result %>%
       mutate(run = i)
     
     # Merge to previous
-    
-    sis_output <- merge(sis_output, sis_result,
+    sir_output <- merge(sir_output, sir_result,
                         by = c("cluster", "vaccine", "time_seq",
                                "infected", "observed", "inc_sus_inf", "inc_vax_inf",
                                "run"), all = TRUE)
@@ -609,12 +640,12 @@ sis_many <- function(..., n_runs) {
   
   # Clean the result
   
-  sis_output <- sis_output %>%
+  sir_many_output <- sir_output %>%
     select("run", "cluster", "vaccine", "time_seq",
            "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
     arrange(run, cluster, time_seq)
   
-  sis_output
+  sir_many_output
 }
 
 
@@ -623,19 +654,19 @@ sis_many <- function(..., n_runs) {
 
 # Graph: mainly to check if run was okay
 
-sis_graph <- function(sis_many_result) {
+sir_graph <- function(sir_many_result) {
   
   ggplot() +
-    geom_line(data = filter(sis_many_result, vaccine == 1),
+    geom_line(data = filter(sir_many_result, vaccine == 1),
               mapping = aes(x = time_seq, y = infected, group = run,
                             color = "Inf_Vax")) +
-    geom_line(data = filter(sis_many_result, vaccine == 0),
+    geom_line(data = filter(sir_many_result, vaccine == 0),
               mapping = aes(x = time_seq, y = infected, group = run,
                             color = "Inf_No")) +
-    geom_line(data = filter(sis_many_result, vaccine == 1),
+    geom_line(data = filter(sir_many_result, vaccine == 1),
               mapping = aes(x = time_seq, y = observed, group = run,
                             color = "Obs_Vax")) +
-    geom_line(data = filter(sis_many_result, vaccine == 0),
+    geom_line(data = filter(sir_many_result, vaccine == 0),
               mapping = aes(x = time_seq, y = observed, group = run,
                             color = "Obs_No")) +
     scale_color_manual(name = NULL,
@@ -650,7 +681,7 @@ sis_graph <- function(sis_many_result) {
                                   "Detected infections in non-vaccine cluster")) +
     xlim(c(1, 100)) +
     theme_classic() +
-    labs(title = "Incidence over time (SIS)",
+    labs(title = "Incidence over time (SIR)",
          x = "Time (days)",
          y = "Number of infections/detected infections") +
     theme(
@@ -667,9 +698,9 @@ sis_graph <- function(sis_many_result) {
 
 # Summary numbers
 
-sis_summary <- function(sis_many_result, n_runs) {
+sir_summary <- function(sir_many_result, n_runs) {
   
-  summary <- sis_many_result %>%
+  summary <- sir_many_result %>%
     group_by(run, cluster) %>%
     mutate(mean_inf = mean(infected)) %>%
     mutate(mean_obs = mean(observed)) %>%
@@ -683,17 +714,17 @@ sis_summary <- function(sis_many_result, n_runs) {
     filter(row_number() == 1) %>%
     select(-time_seq, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
-
+  
 }
 
 
 # Poisson regression : direct effects
 
-sis_direct <- function(sis_summary_result, n_runs) {
+sir_direct <- function(sir_summary_result, n_runs) {
   
   # Direct effect: vax vs unvax in vaccine cluster
-
-  sis_summary_result <- sis_summary_result %>%
+  
+  sir_summary_result <- sir_summary_result %>%
     
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
@@ -706,21 +737,27 @@ sis_direct <- function(sis_summary_result, n_runs) {
   # Output vector to store the results of the test
   
   output <- matrix(0, ncol = 6, nrow = n_runs)
-
+  
   for (i in 1:n_runs) {
     
     model <- glm(formula = incidence ~ vax_incluster,
-                 family = "poisson", data = filter(sis_summary_result, run == i))
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
     
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -735,11 +772,11 @@ sis_direct <- function(sis_summary_result, n_runs) {
 
 # Poisson regression : indirect effects
 
-sis_indirect <- function(sis_summary_result, n_runs) {
+sir_indirect <- function(sir_summary_result, n_runs) {
   
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
-
-  sis_summary_result <- sis_summary_result %>%
+  
+  sir_summary_result <- sir_summary_result %>%
     
     # Focus therefore only on incidence S to I
     select(run, cluster, vaccine, sum_SI) 
@@ -751,17 +788,23 @@ sis_indirect <- function(sis_summary_result, n_runs) {
   for (i in 1:n_runs) {
     
     model <- glm(formula = sum_SI ~ vaccine,
-                 family = "poisson", data = filter(sis_summary_result, run == i))
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
     
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -776,11 +819,11 @@ sis_indirect <- function(sis_summary_result, n_runs) {
 
 # Poisson regression : total effects
 
-sis_total <- function(sis_summary_result, n_runs) {
+sir_total <- function(sir_summary_result, n_runs) {
   
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
   
-  sis_summary_result <- sis_summary_result %>%
+  sir_summary_result <- sir_summary_result %>%
     select(run, cluster, vaccine, sum_SI, sum_VI, sum_all_inc) %>%
     
     # Get one var with VI only from vaccine clusters,
@@ -795,17 +838,23 @@ sis_total <- function(sis_summary_result, n_runs) {
   for (i in 1:n_runs) {
     
     model <- glm(formula = incidence ~ vaccine,
-                 family = "poisson", data = filter(sis_summary_result, run == i))
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
     
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -820,15 +869,15 @@ sis_total <- function(sis_summary_result, n_runs) {
 
 # Poisson regression : overall effects
 
-sis_overall <- function(sis_summary_result, n_runs) {
+sir_overall <- function(sir_summary_result, n_runs) {
   
   # Overall effect: all in vaccine cluster vs all in non-vaccine
   
-  sis_summary_result <- sis_summary_result %>%
+  sir_summary_result <- sir_summary_result %>%
     
     # We are interested in overall incidence
     select(run, cluster, vaccine, sum_all_inc)
-
+  
   # Output vector to store the results of the test
   
   output <- matrix(0, ncol = 6, nrow = n_runs)
@@ -836,17 +885,23 @@ sis_overall <- function(sis_summary_result, n_runs) {
   for (i in 1:n_runs) {
     
     model <- glm(formula = sum_all_inc ~ vaccine,
-                 family = "poisson", data = filter(sis_summary_result, run == i))
+                 family = "poisson", data = filter(sir_summary_result, run == i))
+    
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
     
     # Get the coefficients of the model
     
-    x <- exp(summary(model)$coef)
-    y <- exp(confint(model))
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
     
     # Store them
     
-    output[i, 1:4] <- x[2,]
-    output[i, 5:6] <- y[2,]
+    output[i, 1]   <- x
+    output[i, 2:4] <- y
+    output[i, 5:6] <- z[2,]
   }
   
   # Clean the result vector
@@ -863,35 +918,86 @@ sis_overall <- function(sis_summary_result, n_runs) {
 # CRT: SIMULATIONS --------------------------------------------------------
 
 
-#### 1: Reach equilibrium ####
+#### Save cluster details #### 
 
-equilibrium <- sis_equi(N = N, C = C, cluster_n = cluster_n,
-                        cluster_dis = cluster_dis,
-                        number_infected = number_infected,
-                        R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
-                        time_step = time_step, years = 5)
+library(here)
+library(openxlsx)
+
+dir.create(here("Results"),recursive = TRUE)
+dir.create(here("Results/2step_simulation"),recursive = TRUE)
+
+# Save the cluster data
+
+write.xlsx(as.data.frame(cluster_map), rowNames = TRUE,
+           "Results/2step_simulation/Cluster_map.xlsx")
+
+png("Results/2step_simulation/Cluster_populations.png",
+    width = 10, height = 6, units = 'in', res = 600)
+hist(cluster_n, main = "Histogram of clusters' population",
+     xlab = "Clusters' population", ylab = "Frequency of clusters")
+dev.off()
+
+# With these characteristics
 
 
-#### 2: Run several simulations ####
+#### Run simulations ####
 
-# Run!
+equilibrium <- equilibrium(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
+                           cluster_vstatus = cluster_vstatus, cluster_dis = cluster_dis,
+                           incidence = incidence, birth = birth, death = death,
+                           R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
+                           time_step = time_step, years = 5)
 
-test_sis <- sis_many(N = N, C = C, cluster_n = cluster_n, cluster_dis = cluster_dis,
-                     R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
-                     p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
-                     p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-                     time_step = time_step, years = 1,
-                     equilibrium = equilibrium, n_runs = 10)
+# Check results of equilibrium
+
+equilibrium[[1]]
+
+result_equilibrium <- equilibrium[[2]]
+
+# Run the vaccine model
+
+test <- sir_many(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
+                cluster_vstatus = cluster_vstatus, cluster_dis = cluster_dis,
+                R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
+                p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
+                p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                time_step = time_step, years = 1,
+                equilibrium_result = result_equilibrium, n_runs = 10)
 
 # Graph
 
-plot_sis <- sis_graph(test_sis)
+plot_sir <- sir_graph(test)
 
 # Get summary numbers
 
-summary_sis <- sis_summary(test_sis, n_runs = 10)
+summary_sir <- sir_summary(test, n_runs = 10)
 
-direct_effect <- sis_direct(summary_sis, n_runs = 10)
-indirect_effect <- sis_indirect(summary_sis, n_runs = 10)
-total_effect <- sis_total(summary_sis, n_runs = 10)
-overall_effect <- sis_overall(summary_sis, n_runs = 10)
+# Poisson regression
+
+direct_effect <- sir_direct(summary_sir, n_runs = 10)
+indirect_effect <- sir_indirect(summary_sir, n_runs = 10)
+total_effect <- sir_total(summary_sir, n_runs = 10)
+overall_effect <- sir_overall(summary_sir, n_runs = 10)
+
+
+#### Save results ####
+
+# Give name to simulation
+
+dir.create(here("Results/2step_simulation/Name"),recursive = TRUE)
+
+# Save
+
+png("Results/2step_simulation/Name/SIR_overall.png",
+    width = 18, height = 12, units = 'in', res = 600)
+plot_sir
+dev.off()
+
+write.xlsx(as.data.frame(direct_effect), rowNames = TRUE,
+           "Results/2step_simulation/Name/Direct_Effect.xlsx")
+write.xlsx(as.data.frame(indirect_effect), rowNames = TRUE,
+           "Results/2step_simulation/Name/Indirect_Effect.xlsx")
+write.xlsx(as.data.frame(total_effect), rowNames = TRUE,
+           "Results/2step_simulation/Name/Total_Effect.xlsx")
+write.xlsx(as.data.frame(overall_effect), rowNames = TRUE,
+           "Results/2step_simulation/Name/Overall_Effect.xlsx")
