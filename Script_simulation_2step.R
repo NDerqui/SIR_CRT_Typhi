@@ -357,7 +357,7 @@ equilibrium <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_di
 
 
 
-# CRT: FUNCTIONS ----------------------------------------------------------
+# FUNCTIONS: CRT ----------------------------------------------------------
 
 
 #### Main functions ####
@@ -929,14 +929,14 @@ library(here)
 library(openxlsx)
 
 dir.create(here("Results"),recursive = TRUE)
-dir.create(here("Results/2step_simulation"),recursive = TRUE)
+dir.create(here("Results/2step_simulation_nocompeting"),recursive = TRUE)
 
 # Save the cluster data
 
 write.xlsx(as.data.frame(cluster_map), rowNames = TRUE,
-           "Results/2step_simulation/Cluster_map.xlsx")
+           "Results/2step_simulation_nocompeting/Cluster_map.xlsx")
 
-png("Results/2step_simulation/Cluster_populations.png",
+png("Results/2step_simulation_nocompeting/Cluster_populations.png",
     width = 10, height = 6, units = 'in', res = 600)
 hist(cluster_n, main = "Histogram of clusters' population",
      xlab = "Clusters' population", ylab = "Frequency of clusters")
@@ -996,25 +996,25 @@ overall_effect <- sir_overall(summary_sir, n_runs = 10)
 
 characteristics <- "R0=2 Cover=0.95 VE=0.8"
 
-dir.create(here(paste0("Results/2step_simulation/", characteristics)),recursive = TRUE)
+dir.create(here(paste0("Results/2step_simulation_nocompeting/", characteristics)),recursive = TRUE)
 
 # Save
 
-png(paste0("Results/2step_simulation/", characteristics,"/SIR_equilibrium.png"),
+png(paste0("Results/2step_simulation_nocompeting/", characteristics,"/SIR_equilibrium.png"),
     width = 20, height = 12, units = 'in', res = 600)
 equilibrium[[1]]
 dev.off()
 
-png(paste0("Results/2step_simulation/", characteristics,"/SIR_after_vax.png"),
+png(paste0("Results/2step_simulation_nocompeting/", characteristics,"/SIR_after_vax.png"),
     width = 20, height = 12, units = 'in', res = 600)
 plot_sir
 dev.off()
 
 write.xlsx(as.data.frame(direct_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation/", characteristics,"/Direct_Effect.xlsx"))
+           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Direct_Effect.xlsx"))
 write.xlsx(as.data.frame(indirect_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation/", characteristics,"/Indirect_Effect.xlsx"))
+           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Indirect_Effect.xlsx"))
 write.xlsx(as.data.frame(total_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation/", characteristics,"/Total_Effect.xlsx"))
+           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Total_Effect.xlsx"))
 write.xlsx(as.data.frame(overall_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation/", characteristics,"/Overall_Effect.xlsx"))
+           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Overall_Effect.xlsx"))
