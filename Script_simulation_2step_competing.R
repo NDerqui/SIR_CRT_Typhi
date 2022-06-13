@@ -456,17 +456,32 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   ## Basic structure
   
   names_row <- paste0("t_", time_seq)
-  names_column <- c("cluster", "vaccine", "time_seq",
-                    "no_N", "no_S", "no_V", "no_I", "no_R",
-                    "haz_inf", "prob_infec", "inc_SI", "prob_vaxin", "inc_VI",
-                    "prob_recov", "inc_IR",
-                    "prob_death", "inc_SD", "inc_VD", "inc_ID", "inc_RD",
-                    "prob_birth", "inc_NB")
+  names_column <- c("cluster", "vaccine", "time_seq",       # 1 2 3
+                    "no_N", "no_S", "no_V", "no_I", "no_R", # 4 5 6 7 8
+                    "haz_inf",                              # 9
+                    "prob_S_to_x", "inc_Sx",                # 10 11
+                    "prob_V_to_y", "inc_Vy",                # 12 13
+                    "prob_x_to_I", "inc_SI",                # 14 15
+                    "prob_x_to_D", "inc_SD",                # 16 17
+                    "prob_y_to_I", "inc_VI",                # 18 19
+                    "prob_y_to_D", "inc_VD",                # 20 21
+                    "prob_recov", "inc_IR",                 # 22 23
+                    "prob_death", "inc_ID", "inc_RD",       # 24 25 26
+                    "prob_birth", "inc_NB")                 # 27 28
   names_matrix <- paste0("cluster_", cluster_no)
-  sir <- array(c(cluster, v_cluster, time_seq, no_N, no_S, no_V, no_I, no_R,
-                 haz_inf, prob_infec, inc_SI, prob_vaxin, inc_VI, prob_recov, inc_IR,
-                 prob_death, inc_SD, inc_VD, inc_ID, inc_RD, prob_birth, inc_NB),
-               dim = c(length(time_seq), 22, C),
+  sir <- array(c(cluster, vaccine, time_seq,
+                 no_N, no_S, no_V, no_I, no_R,
+                 haz_inf,
+                 prob_S_to_x, inc_Sx,
+                 prob_V_to_y, inc_Vy,
+                 prob_x_to_I, inc_SI,
+                 prob_x_to_D, inc_SD,
+                 prob_y_to_I, inc_VI,
+                 prob_y_to_D, inc_VD,
+                 prob_recov, inc_IR,
+                 prob_death, inc_ID, inc_RD,
+                 prob_birth, inc_NB),
+               dim = c(length(time_seq), length(names_column), C),
                dimnames = list(names_row, names_column, names_matrix))
   
   ## Assign initial values
@@ -501,7 +516,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
     
     for (i in 2:length(time_seq)) {
       
-      # From S to I
+      # From S to event(x)
       
       sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
       for (k in 1:C) { # Loop to add external FOI
@@ -509,37 +524,55 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
           sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
         }
       }
-      sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
+      sir[i, 10, j] = (1 - exp(-(sir[i, 9, j] + death)*time_step))
       sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
       
-      # From V to I
+      # From V to event(y)
       
-      sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
+      sir[i, 12, j] = (1 - exp(-(sir[i, 9, j]*(1 - vax_eff) + death)*time_step))
       sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0)
+      
+      # From x to I
+      
+      sir[i, 14, j] = sir[i, 9, j]/(sir[i, 9, j] + death)
+      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 11, j], prob = sir[i, 14, j]), digits = 0)
+      
+      # From x to D
+      
+      sir[i, 16, j] = death/(sir[i, 9, j] + death)
+      sir[i, 17, j] = round(rbinom(n = 1, size = sir[i-1, 11, j], prob = sir[i, 16, j]), digits = 0)
+      
+      # From y to I
+      
+      sir[i, 18, j] = sir[i, 9, j]*(1 - vax_eff)/(sir[i, 9, j]*(1 - vax_eff) + death)
+      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 13, j], prob = sir[i, 18, j]), digits = 0)
+      
+      # From y to D
+      
+      sir[i, 20, j] = death/(sir[i, 9, j]*(1 - vax_eff) + death)
+      sir[i, 21, j] = round(rbinom(n = 1, size = sir[i-1, 13, j], prob = sir[i, 20, j]), digits = 0)
       
       # From I to R
       
-      sir[i, 14, j] = (1 - exp(-(1/dur_inf)*time_step))  
-      sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j]), digits = 0)  
+      sir[i, 22, j] = (1 - exp(-(1/dur_inf)*time_step))  
+      sir[i, 23, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 22, j]), digits = 0)  
       
       # Deaths
       
-      sir[i, 16, j] = (1 - exp(-death*time_step))  
-      sir[i, 17, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j]), digits = 0) 
-      sir[i, 18, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j]), digits = 0) 
-      sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j]), digits = 0) 
-      sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j]), digits = 0) 
+      sir[i, 24, j] = (1 - exp(-death*time_step))  
+      sir[i, 25, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 24, j]), digits = 0) 
+      sir[i, 26, j] = round(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 24, j]), digits = 0) 
       
       # Births
       
-      sir[i, 21, j] = (1 - exp(-birth*time_step))  
-      sir[i, 22, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j]), digits = 0) 
+      sir[i, 27, j] = (1 - exp(-birth*time_step))  
+      sir[i, 28, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 27, j]), digits = 0) 
       
       # Model equations
-      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + round(sir[i, 22, j]*(1-p_vax), digits = 0)
-      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + round(sir[i, 22, j]*(p_vax), digits = 0)
-      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]
-      sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]
+      sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] + round(sir[i, 28, j]*(1-p_vax), digits = 0)
+      sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] + round(sir[i, 28, j]*(p_vax), digits = 0)
+      sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 15, j] + sir[i, 19, j] - sir[i, 23, j] - sir[i, 25, j]
+      sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 23, j] - sir[i, 26, j]
       sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
       
     }
