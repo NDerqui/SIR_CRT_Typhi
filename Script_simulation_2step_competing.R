@@ -63,7 +63,7 @@ imp_rate <- 0.25
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
-vax_eff <- 0.8     # Vaccine effectiveness (infection)
+vax_eff <- 0.7     # Vaccine effectiveness (infection)
 
 
 #### Detected infections ####
