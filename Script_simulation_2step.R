@@ -63,7 +63,7 @@ imp_rate <- 0.25
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
-vax_eff <- 0.8     # Vaccine effectiveness (infection)
+vax_eff <- 0.7     # Vaccine effectiveness (infection)
 
 
 #### Detected infections ####
@@ -954,6 +954,7 @@ sir_overall <- function(sir_summary_result, n_runs) {
 
 library(here)
 library(openxlsx)
+library(forcats)
 
 dir.create(here("Results"),recursive = TRUE)
 dir.create(here("Results/2step_simulation_nocompeting"),recursive = TRUE)
@@ -988,7 +989,8 @@ ggplot(data = data.frame(number = cluster_no, pop = cluster_n, vax = cluster_vst
     legend.position = "bottom",
     legend.title = element_text(size = rel(1), face="bold"),
     legend.text = element_text(size=rel(1))) +
-  facet_wrap(~as.numeric(cluster_map), ncol = sqrt(C), nrow = sqrt(C))
+  facet_wrap(~fct_relevel(as.character(number), as.character(cluster_map)),
+             ncol = sqrt(C), nrow = sqrt(C))
 dev.off()
 
 
