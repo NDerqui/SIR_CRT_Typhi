@@ -93,21 +93,48 @@ hist(cluster_n, main = "Histogram of clusters' population",
 
 #### Clusters ####
 
-# Vector of clusters
+random_cluster <- 1
 
-cluster_no <- seq(1:C)
+# If 1 the first 50 clusters are vaccinated, but randomly distributed in map
+# If 0 the vaccine clusters are allocated like a chessboard
 
-# Vaccination status of clusters
+# Cluster (and vaccine allocation) distribution
 
-V <- C*p_clusvax                                           # Number of clusters in the vaccine group
-cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
-
-
-# Cluster map
-# Random location of clusters (cannot be in order, we vax the first proportion)
-
-cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
-                      dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+if (random_cluster == 1) {
+  
+  # Vector of clusters
+  
+  cluster_no <- seq(1:C)
+  
+  # Vaccination status of clusters
+  
+  V <- C*p_clusvax                                           # Number of clusters in the vaccine group
+  cluster_vstatus <- c(rep(1, times = V), rep(0, times = V)) # Flag for vax clusters
+  
+  # Cluster map
+  # Random location of clusters (cannot be in order, we vax the first proportion)
+  
+  cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
+                        dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+  
+} else {
+  
+  # Vector of clusters
+  
+  cluster_no <- seq(1:C)
+  
+  # Vaccination status of clusters
+  
+  V <- C*p_clusvax                                # Number of clusters in the vaccine group
+  cluster_vstatus <- c(rep(c(0, 1), times = C/2)) # Flag for vax clusters
+  
+  # Cluster map
+  # Random location of clusters (cannot be in order, we vax the first proportion)
+  
+  cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
+                        dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+  
+}
 
 # Cluster distance matrix
 
@@ -745,7 +772,7 @@ sir_graph <- function(sir_many_result) {
       axis.text = element_text(size=rel(1)),
       legend.position = "bottom",
       legend.text = element_text(size=rel(1))) +
-    facet_wrap(~cluster, ncol = 10, nrow = 10)
+    facet_wrap(~cluster, ncol = sqrt(C), nrow = sqrt(C))
   
 }
 
@@ -991,14 +1018,38 @@ hist(cluster_n, main = "Histogram of clusters' population",
      xlab = "Clusters' population", ylab = "Frequency of clusters")
 dev.off()
 
+png("Results/2step_simulation_competing/Cluster_map.png",
+    width = 10, height = 12, units = 'in', res = 600)
+ggplot(data = data.frame(number = cluster_no, pop = cluster_n, vax = cluster_vstatus)) +
+  geom_label(aes(x = pop, y = vax, label = pop, color = as.factor(vax))) +
+  xlim(c(1000, 3000)) +
+  ylim(c(-1, 2)) +
+  theme_classic() +
+  labs(x = "Cluster population",
+       y = NULL) +
+  scale_color_discrete(name="Cluster vaccination status",
+                       breaks = c("0", "1"),
+                       labels=c("Non-vaccinated", "Vaccinated")) +
+  theme(
+    axis.title.x = element_text(size = rel(1.1), face="bold"),
+    axis.title.y = element_text(size = rel(1.1), face="bold"),
+    axis.text = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(size = rel(1), face="bold"),
+    legend.text = element_text(size=rel(1))) +
+  facet_wrap(~as.numeric(cluster_map), ncol = sqrt(C), nrow = sqrt(C))
+dev.off()
+
+
+#### Run simulations ####
+
 # With these characteristics
 
 R0
 p_vax <- 0.95
 vax_eff
 
-
-#### Run simulations ####
+# Equilibrium
 
 equilibrium <- equilibrium(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
                            cluster_vstatus = cluster_vstatus, cluster_dis = cluster_dis,
