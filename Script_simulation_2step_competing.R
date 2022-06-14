@@ -496,7 +496,7 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
                     "prob_death", "inc_ID", "inc_RD",       # 24 25 26
                     "prob_birth", "inc_NB")                 # 27 28
   names_matrix <- paste0("cluster_", cluster_no)
-  sir <- array(c(cluster, vaccine, time_seq,
+  sir <- array(c(cluster, v_cluster, time_seq,
                  no_N, no_S, no_V, no_I, no_R,
                  haz_inf,
                  prob_S_to_x, inc_Sx,
