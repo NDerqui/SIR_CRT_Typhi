@@ -460,19 +460,25 @@ sir_model <- function(N, C, cluster_no, cluster_n, cluster_vstatus, cluster_dis,
   
   ##  Probabilities: 1 - exp(hazard)
   
-  prob_infec <- rep(0, times = length(time_seq))
-  prob_vaxin <- rep(0, times = length(time_seq))
+  prob_S_to_x <- rep(0, times = length(time_seq))
+  prob_V_to_y <- rep(0, times = length(time_seq))
+  prob_x_to_I <- rep(0, times = length(time_seq))
+  prob_x_to_D <- rep(0, times = length(time_seq))
+  prob_y_to_I <- rep(0, times = length(time_seq))
+  prob_y_to_D <- rep(0, times = length(time_seq))
   prob_recov <- rep(0, times = length(time_seq))
   prob_death <- rep(0, times = length(time_seq))
   prob_birth <- rep(0, times = length(time_seq))
   
   ## State variables: incidence/recovery
   
+  inc_Sx <- as.integer(rep(0, times = length(time_seq)))
+  inc_Vy <- as.integer(rep(0, times = length(time_seq)))
   inc_SI <- as.integer(rep(0, times = length(time_seq)))
-  inc_VI <- as.integer(rep(0, times = length(time_seq)))
-  inc_IR <- as.integer(rep(0, times = length(time_seq)))
   inc_SD <- as.integer(rep(0, times = length(time_seq)))
+  inc_VI <- as.integer(rep(0, times = length(time_seq)))
   inc_VD <- as.integer(rep(0, times = length(time_seq)))
+  inc_IR <- as.integer(rep(0, times = length(time_seq)))
   inc_ID <- as.integer(rep(0, times = length(time_seq)))
   inc_RD <- as.integer(rep(0, times = length(time_seq)))
   inc_NB <- as.integer(rep(0, times = length(time_seq)))
