@@ -686,9 +686,9 @@ sir_many <- function(..., n_runs) {
 
 # Graph: mainly to check if run was okay
 
-sir_graph <- function(sir_many_result) {
+sir_graph <- function(sir_many_result, cluster_map) {
   
-  ggplot() +
+  ggplot(data = sir_many_result) +
     geom_line(data = filter(sir_many_result, vaccine == 1),
               mapping = aes(x = time_seq, y = infected, group = run,
                             color = "Inf_Vax")) +
@@ -711,7 +711,6 @@ sir_graph <- function(sir_many_result) {
                                   "Infections in non-vaccine clusters",
                                   "Detected infections in vaccine clusters",
                                   "Detected infections in non-vaccine cluster")) +
-    xlim(c(1, 100)) +
     theme_classic() +
     labs(title = "Incidence over time (SIR)",
          x = "Time (days)",
@@ -723,7 +722,8 @@ sir_graph <- function(sir_many_result) {
       axis.text = element_text(size=rel(1)),
       legend.position = "bottom",
       legend.text = element_text(size=rel(1))) +
-    facet_wrap(~cluster, ncol = sqrt(C), nrow = sqrt(C))
+    facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
+               ncol = sqrt(C), nrow = sqrt(C))
   
 }
 
@@ -999,8 +999,10 @@ dev.off()
 # With these characteristics
 
 R0
-p_vax <- 0.95
+p_vax 
 vax_eff
+N
+C
 
 # Equilibrium
 
@@ -1024,12 +1026,12 @@ test <- sir_many(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
                 p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
                 p_sym = p_sym, p_test = p_test, p_positive = p_positive,
                 birth = birth, death = death,
-                time_step = time_step, years = 1,
+                time_step = time_step, years = 2,
                 equilibrium_result = result_equilibrium, n_runs = 10)
 
 # Graph
 
-plot_sir <- sir_graph(test)
+plot_sir <- sir_graph(test, cluster_map)
 
 # Get summary numbers
 
@@ -1047,7 +1049,7 @@ overall_effect <- sir_overall(summary_sir, n_runs = 10)
 
 # Give name to simulation
 
-characteristics <- "R0=2 Cover=0.95 VE=0.8"
+characteristics <- "N=200k C=100 sd=100 R0=2 Cover=0.8 VE=0.8"
 
 dir.create(here(paste0("Results/2step_simulation_nocompeting/", characteristics)),recursive = TRUE)
 
