@@ -703,16 +703,16 @@ sir_graph <- function(sir_many_result, cluster_map) {
                             color = "Obs_No")) +
     scale_color_manual(name = NULL,
                        breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
-                       values = c("Inf_Vax" = "steelblue4",
-                                  "Inf_No" = "steelblue1",
-                                  "Obs_Vax" = "palegreen4",
-                                  "Obs_No" = "palegreen1"),
+                       values = c("Inf_Vax" = "limegreen",
+                                  "Inf_No" = "firebrick",
+                                  "Obs_Vax" = "greenyellow",
+                                  "Obs_No" = "red"),
                        labels = c("Infections in vaccine clusters",
                                   "Infections in non-vaccine clusters",
                                   "Detected infections in vaccine clusters",
                                   "Detected infections in non-vaccine cluster")) +
     theme_classic() +
-    labs(title = "Incidence over time (SIR)",
+    labs(title = "Incidence over time",
          x = "Time (days)",
          y = "Number of infections/detected infections") +
     theme(
@@ -973,19 +973,21 @@ dev.off()
 png("Results/2step_simulation_nocompeting/Cluster_map.png",
     width = 10, height = 12, units = 'in', res = 600)
 ggplot(data = data.frame(number = cluster_no, pop = cluster_n, vax = cluster_vstatus)) +
-  geom_label(aes(x = pop, y = vax, label = pop, color = as.factor(vax))) +
-  xlim(c(1000, 3000)) +
-  ylim(c(-1, 2)) +
+  geom_point(aes(x = pop, y = vax, color = as.factor(vax)), size = rel(30)) +
+  geom_label(aes(x = pop, y = vax, label = pop, color = as.factor(vax)), size = rel(8)) +
+  xlim(c(0.8*mean(cluster_n), 1.2*mean(cluster_n))) +
+  ylim(c(-2, 3)) +
   theme_classic() +
   labs(x = "Cluster population",
        y = NULL) +
-  scale_color_discrete(name="Cluster vaccination status",
-                       breaks = c("0", "1"),
-                       labels=c("Non-vaccinated", "Vaccinated")) +
+  scale_color_manual(name = "Cluster vaccination status",
+                     labels=c("Non-vaccinated", "Vaccinated"),
+                     values = c("firebrick", "limegreen")) +
   theme(
     axis.title.x = element_text(size = rel(1.1), face="bold"),
     axis.title.y = element_text(size = rel(1.1), face="bold"),
     axis.text = element_blank(),
+    axis.ticks = element_blank(),
     legend.position = "bottom",
     legend.title = element_text(size = rel(1), face="bold"),
     legend.text = element_text(size=rel(1))) +
