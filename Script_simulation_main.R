@@ -19,10 +19,8 @@ rm(list = ls())
 library(tidyverse)
 library(sandwich)
 library(lmtest)
-
-library(here)
-library(openxlsx)
 library(forcats)
+library(DescTools)
 
 
 
@@ -94,8 +92,6 @@ C <- 100                          # Number of clusters
 
 n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
 cluster_n <- abs(n)                                         # Vector of cluster populations
-hist(cluster_n, main = "Histogram of clusters' population",
-     xlab = "Clusters' population", ylab = "Frequency of clusters")
 
 
 #### Clusters ####
@@ -185,13 +181,13 @@ diag(cluster_dis) <- 1
 
 
 main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
-                        cluster_n, cluster_vstatus, 
-                        incidence, birth, death,       # Incidence, birth and death raye
-                        R0, dur_inf, imp_rate,         # Infection parameters
-                        p_vax, p_clusvax, vax_eff,     # Vaccination parameters
-                        p_sym, p_test, p_positive,     # Observed infections
-                        time_step, years1, years2,     # Time: years for equi, years for vax
-                        n_runs) {   
+                 cluster_n, cluster_vstatus, 
+                 incidence, birth, death,       # Incidence, birth and death rate
+                 R0, dur_inf, imp_rate,         # Infection parameters
+                 p_vax, p_clusvax, vax_eff,     # Vaccination parameters
+                 p_sym, p_test, p_positive,     # Observed infections
+                 time_step, years1, years2,     # Time: years for equi, years for vax
+                 n_runs) {   
   
   
   ## Considerations
@@ -246,11 +242,11 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
   
   ## For several simulations
   
-  for (n in n_runs) {
-    
-    sir_output <- data.frame(cluster = 0, vaccine = 0, time_seq = 0,
-                             infected = 0, observed = 0,
-                             inc_sus_inf = 0, inc_vax_inf = 0, run = 0)
+  sir_output <- data.frame(cluster = 0, vaccine = 0, time_seq = 0,
+                           infected = 0, observed = 0,
+                           inc_sus_inf = 0, inc_vax_inf = 0, run = 0)
+  
+  for (n in 1:n_runs) {
     
     
     ## Step 1: reach equilibrium
@@ -514,7 +510,14 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
                                "observed", "inc_sus_inf", "inc_vax_inf", "run"),
                         all = TRUE)
     
-    }
+    sir_output <- sir_output %>%
+      select("run", "cluster", "vaccine", "time_seq",
+             "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
+      arrange(run, cluster, time_seq)
+    
+  }
+  
+  sir_output <- sir_output[2:nrow(sir_output),]
   
   
   
@@ -523,17 +526,17 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
   # Plot
   
   sir_vax_plot <- ggplot(data = sir_output) +
-    geom_line(data = filter(sir_outout, vaccine == 1),
-              mapping = aes(x = time_seq2, y = infected, group = run,
+    geom_line(data = filter(sir_output, vaccine == 1),
+              mapping = aes(x = time_seq, y = infected, group = run,
                             color = "Inf_Vax")) +
     geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq2, y = infected, group = run,
+              mapping = aes(x = time_seq, y = infected, group = run,
                             color = "Inf_No")) +
     geom_line(data = filter(sir_output, vaccine == 1),
-              mapping = aes(x = time_seq2, y = observed, group = run,
+              mapping = aes(x = time_seq, y = observed, group = run,
                             color = "Obs_Vax")) +
     geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq2, y = observed, group = run,
+              mapping = aes(x = time_seq, y = observed, group = run,
                             color = "Obs_No")) +
     scale_color_manual(name = NULL,
                        breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
@@ -559,7 +562,7 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
     facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
                ncol = sqrt(C), nrow = sqrt(C))
   
-  # Summarise the results
+  # Summarize the results
   
   summary <- sir_output %>%
     group_by(run, cluster) %>%
@@ -752,19 +755,27 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
   poisson_summary[3, 1:3] <- MeanCI(output_total[,1])
   poisson_summary[4, 1:3] <- MeanCI(output_overall[,1])
   
-  poisson_summary[1, 4] <- MeanCI(output_direct[,4])[1,]
-  poisson_summary[2, 4] <- MeanCI(output_indirect[,4])[1,]
-  poisson_summary[3, 4] <- MeanCI(output_total[,4])[1,]
-  poisson_summary[4, 4] <- MeanCI(output_overall[,4])[1,]
+  poisson_summary[1, 4] <- MeanCI(output_direct[,4])[1]
+  poisson_summary[2, 4] <- MeanCI(output_indirect[,4])[1]
+  poisson_summary[3, 4] <- MeanCI(output_total[,4])[1]
+  poisson_summary[4, 4] <- MeanCI(output_overall[,4])[1]
   
   rownames(poisson_summary) <- c("Direct", "Indirect", "Total", "Overall")
-  colnames(poisson_summary) <- c("Mean Effect", "Lower CI", "Upper CI", "p")
+  colnames(poisson_summary) <- c("Mean Effect", "Lower CI", "Upper CI", "P-value")
+  
+  poisson_summary <- round(poisson_summary, digits = 4)
   
   
   
   ## Returned objects
   
-  list <- list(cluster_data,
+  name_simulation <- paste0("N=", N, " C=", C, " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
+  
+  other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death, " R0=", R0, " DurationInf=", dur_inf, " YearsEq=", years1, " YearsVax=", years2)
+  
+  list <- list(name_simulation,
+               other_characteristics,
+               cluster_data,
                cluster_pop,
                cluster_pop_map,
                sir_vax_plot,
