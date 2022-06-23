@@ -12,4 +12,10 @@ Results/
 .Rhistory
 .Rproj.user
 
+# Old R scripts
+
+Script_simulation_2step_competing.R
+Script_simulation_2step.R
+SCript_SIR_exploration.R
+
 # Data Files
