@@ -88,7 +88,7 @@ time_step <- 1      # Time step change (days)
 # Total population in the study and number of clusters
 
 N <- 200000                       # Total population in the study
-C <- 83                         # Number of clusters
+C <- 100                  # Number of clusters
 
 n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
 cluster_n <- abs(n)                                         # Vector of cluster populations
@@ -96,7 +96,7 @@ cluster_n <- abs(n)                                         # Vector of cluster 
 
 #### Clusters ####
 
-random_cluster <- 1
+random_cluster <- 0
 
 # If 1 the first 50 clusters are vaccinated, but randomly distributed in map
 # If 0 the vaccine clusters are allocated like a chessboard
@@ -109,26 +109,27 @@ if (random_cluster == 1) {
   
   cluster_no <- seq(1:C)
   
-  # Vaccination status of clusters
-  
-  V <- C*p_clusvax                    # Number of clusters in the vaccine group
-  
-  if (V %% 2 == 0) {
-    cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   # Flag for vax clusters
-  } else {
-    cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) # Flag for vax clusters
-  }
-  
   # Cluster map
-  # Random location of clusters (cannot be in order, we vax the first proportion)
+  # Random location of clusters
   
   if (sqrt(C) %% 1 == 0) {
     cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
                           dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
   } else {
-    cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(ceiling(sqrt(C))+1) - C))),
-                          ncol = ceiling(sqrt(C)), nrow = (ceiling(sqrt(C)) + 1),
-                          dimnames = list(seq(1:(ceiling(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
+    cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+                          ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
+                          dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
+  }
+  
+  # Vaccination status of clusters
+  # Vaccination of the first half of clusters (randmly located)
+  
+  V <- C*p_clusvax                    
+  
+  if (C %% 2 == 0) {
+    cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
+  } else {
+    cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) 
   }
   
 } else {
@@ -137,28 +138,36 @@ if (random_cluster == 1) {
   
   cluster_no <- seq(1:C)
   
-  # Vaccination status of clusters
-  
-  V <- C*p_clusvax                      # Number of clusters in the vaccine group
-
-  if (V %% 2 == 0) {
-    cluster_vstatus <- c(rep(c(0, 1), times = C/2)) # Flag for vax clusters
-  } else {
-    cluster_vstatus <- c(rep(c(0, 1), times = C/2), 0) # Flag for vax clusters
-  }
-  
   # Cluster map
-  # Random location of clusters (cannot be in order, we vax the first proportion)
+  # Location of clusters is not random, follows an order
   
   if (sqrt(C) %% 1 == 0) {
     cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
                           dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
   } else {
-    cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(ceiling(sqrt(C))+1) - C))),
-                          ncol = ceiling(sqrt(C)), nrow = (ceiling(sqrt(C)) + 1),
-                          dimnames = list(seq(1:(ceiling(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
+    cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+                          ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
+                          dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
   }
   
+  # Vaccination status of clusters
+  # Vaccination like a chessboard
+  
+  V <- C*p_clusvax                      
+  
+  if (nrow(cluster_map) %% 2 == 0) {
+    cluster_vstatus <- rep(c(rep(c(0,1), times = nrow(cluster_map)/2),
+                             rep(c(1,0), times = nrow(cluster_map)/2)),
+                           times = ncol(cluster_map)/2)
+    cluster_vstatus <- cluster_vstatus[1:length(cluster_no)]
+  } else {
+    if (C %% 2 == 0) {
+      cluster_vstatus <- c(rep(c(0, 1), times = C/2)) # Flag for vax clusters
+    } else {
+      cluster_vstatus <- c(rep(c(0, 1), times = C/2), 0) # Flag for vax clusters
+    }
+  }
+
 }
 
 # Cluster distance matrix
@@ -169,12 +178,12 @@ cluster_dis <- matrix(1, nrow = C, ncol = C,
 for (i in 1:C) {                          # Each cluster distance
   for (j in 1:C) {                        # with each of the others
     
-    for (k in 1:sqrt(C)) {                # Look for location of first cluster
-      for (l in 1:sqrt(C)) {
+    for (k in 1:nrow(cluster_map)) {                # Look for location of first cluster
+      for (l in 1:ncol(cluster_map)) {
         if (i == cluster_map[k, l] & !is.na(cluster_map[k, l])) {
           
-          for (m in 1:sqrt(C)) {          # Look for location of second cluster
-            for (n in 1:sqrt(C)) {
+          for (m in 1:nrow(cluster_map)) {          # Look for location of second cluster
+            for (n in 1:ncol(cluster_map)) {
               if (j == cluster_map[m, n] & !is.na(cluster_map[m, n])) {
                 
                 # Function to get the distance
@@ -257,9 +266,9 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
       legend.title = element_text(size = rel(1), face="bold"),
       legend.text = element_text(size=rel(1)),
       strip.text.x = element_text(size = rel(2))) +
-    facet_wrap(~fct_relevel(as.character(number), as.character(cluster_map)),
-               ncol = sqrt(C), nrow = sqrt(C)) 
-  
+    facet_wrap(~ fct_relevel(as.character(number), as.character(cluster_map)),
+                 ncol = nrow(cluster_map)) 
+  cluster_pop_map
   
   
   ## For several simulations
