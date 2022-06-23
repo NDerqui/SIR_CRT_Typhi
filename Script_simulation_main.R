@@ -12,6 +12,7 @@
 
 
 
+
 # SET UP ------------------------------------------------------------------
 
 rm(list = ls())
@@ -28,7 +29,7 @@ library(DescTools)
 # PARAMETERS --------------------------------------------------------------
 
 
-# Parameters to be fixed across all runs
+# Parameters to be explored in the runs
 
 
 #### Incidence, birth and death ####
@@ -61,7 +62,6 @@ dur_inf <- 7       # Duration of infectiousness (days)
 # Importation rate: from external clusters to a given one (??)
 
 imp_rate <- 0.5
-imp_rate <- 0.25
 
 
 #### Vaccination ####
@@ -78,146 +78,30 @@ p_test <- 0.50      # Probability of seeking a test - CHECK
 p_positive <- 0.60  # Probability of test being positive
 
 
-#### Time frame ####
-
-time_step <- 1      # Time step change (days)
-
-
 #### Population ####
 
 # Total population in the study and number of clusters
 
-N <- 200000                       # Total population in the study
+N <- 200000               # Total population in the study
 C <- 100                  # Number of clusters
-
-n <- round(rnorm(n = C, mean = N/C, sd = 100), digits = 0)  # Pop in each cluster
-cluster_n <- abs(n)                                         # Vector of cluster populations
-
-
-#### Clusters ####
+sd <- 100                 # Variance in cluster populations
 
 random_cluster <- 0
 
 # If 1 the first 50 clusters are vaccinated, but randomly distributed in map
 # If 0 the vaccine clusters are allocated like a chessboard
 
-# Cluster (and vaccine allocation) distribution
-
-if (random_cluster == 1) {
-  
-  # Vector of clusters
-  
-  cluster_no <- seq(1:C)
-  
-  # Cluster map
-  # Random location of clusters
-  
-  if (sqrt(C) %% 1 == 0) {
-    cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
-                          dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
-  } else {
-    cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
-                          ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
-                          dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
-  }
-  
-  # Vaccination status of clusters
-  # Vaccination of the first half of clusters (randmly located)
-  
-  V <- C*p_clusvax                    
-  
-  if (C %% 2 == 0) {
-    cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
-  } else {
-    cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) 
-  }
-  
-} else {
-  
-  # Vector of clusters
-  
-  cluster_no <- seq(1:C)
-  
-  # Cluster map
-  # Location of clusters is not random, follows an order
-  
-  if (sqrt(C) %% 1 == 0) {
-    cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
-                          dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
-  } else {
-    cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
-                          ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
-                          dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
-  }
-  
-  # Vaccination status of clusters
-  # Vaccination like a chessboard
-  
-  V <- C*p_clusvax                      
-  
-  if (nrow(cluster_map) %% 2 == 0) {
-    cluster_vstatus <- rep(c(rep(c(0,1), times = nrow(cluster_map)/2),
-                             rep(c(1,0), times = nrow(cluster_map)/2)),
-                           times = ncol(cluster_map)/2)
-    cluster_vstatus <- cluster_vstatus[1:length(cluster_no)]
-  } else {
-    if (C %% 2 == 0) {
-      cluster_vstatus <- c(rep(c(0, 1), times = C/2)) # Flag for vax clusters
-    } else {
-      cluster_vstatus <- c(rep(c(0, 1), times = C/2), 0) # Flag for vax clusters
-    }
-  }
-
-}
-
-# Cluster distance matrix
-
-cluster_dis <- matrix(1, nrow = C, ncol = C,
-                      dimnames = list(seq(1:C), seq(1:C)))
-
-for (i in 1:C) {                          # Each cluster distance
-  for (j in 1:C) {                        # with each of the others
-    
-    for (k in 1:nrow(cluster_map)) {                # Look for location of first cluster
-      for (l in 1:ncol(cluster_map)) {
-        if (i == cluster_map[k, l] & !is.na(cluster_map[k, l])) {
-          
-          for (m in 1:nrow(cluster_map)) {          # Look for location of second cluster
-            for (n in 1:ncol(cluster_map)) {
-              if (j == cluster_map[m, n] & !is.na(cluster_map[m, n])) {
-                
-                # Function to get the distance
-                
-                vertical <- abs(m - k)
-                horizontal <- abs(n - l)
-                distance <- sqrt(horizontal^2 + vertical^2)
-                
-                cluster_dis[i, j] <- round(distance, digits = 3)
-              }
-            }
-          }
-          
-        }
-      }
-    }
-    
-  }
-}
-diag(cluster_dis) <- 0
-
-
 
 
 # FUNCTION -------------------------------------------------------------
 
 
-main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
-                 cluster_n, cluster_vstatus, 
+main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
                  incidence, birth, death,       # Incidence, birth and death rate
                  R0, dur_inf, imp_rate,         # Infection parameters
                  p_vax, p_clusvax, vax_eff,     # Vaccination parameters
                  p_sym, p_test, p_positive,     # Observed infections
-                 time_step, years1, years2,     # Time: years for equi, years for vax
+                 time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
                  n_runs) {   
   
   
@@ -230,7 +114,114 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
   
   
   
-  ## Cluster data for reference
+  ## Cluster data
+  
+  # Vector of clusters
+  
+  cluster_no <- seq(1:C)
+  
+  # Population in each cluster vector
+  
+  n <- round(rnorm(n = C, mean = N/C, sd = sd), digits = 0)
+  cluster_n <- abs(n)
+  
+  # Cluster (and vaccine allocation) distribution
+  
+  if (random_cluster == 1) {
+    
+    # Cluster map
+    # Random location of clusters
+    
+    if (sqrt(C) %% 1 == 0) {
+      cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
+                            dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+    } else {
+      cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+                            ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
+                            dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
+    }
+    
+    # Vaccination status of clusters
+    # Vaccination of the first half of clusters (randmly located)
+    
+    V <- C*p_clusvax                    
+    
+    if (C %% 2 == 0) {
+      cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
+    } else {
+      cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) 
+    }
+    
+  } else {
+    
+    # Cluster map
+    # Location of clusters is not random, follows the order
+    
+    if (sqrt(C) %% 1 == 0) {
+      cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
+                            dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
+    } else {
+      cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+                            ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
+                            dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
+    }
+    
+    # Vaccination status of clusters
+    # Vaccination like a chessboard
+    
+    V <- C*p_clusvax                      
+    
+    if (nrow(cluster_map) %% 2 == 0) {
+      cluster_vstatus <- rep(c(rep(c(0,1), times = nrow(cluster_map)/2),
+                               rep(c(1,0), times = nrow(cluster_map)/2)),
+                             times = ncol(cluster_map)/2)
+      cluster_vstatus <- cluster_vstatus[1:length(cluster_no)]
+    } else {
+      if (C %% 2 == 0) {
+        cluster_vstatus <- c(rep(c(0, 1), times = C/2)) # Flag for vax clusters
+      } else {
+        cluster_vstatus <- c(rep(c(0, 1), times = C/2), 0) # Flag for vax clusters
+      }
+    }
+    
+  }
+  
+  # Cluster distance matrix
+  
+  cluster_dis <- matrix(1, nrow = C, ncol = C,
+                        dimnames = list(seq(1:C), seq(1:C)))
+  
+  for (i in 1:C) {                          # Each cluster distance
+    for (j in 1:C) {                        # with each of the others
+      
+      for (k in 1:nrow(cluster_map)) {                # Look for location of first cluster
+        for (l in 1:ncol(cluster_map)) {
+          if (i == cluster_map[k, l] & !is.na(cluster_map[k, l])) {
+            
+            for (m in 1:nrow(cluster_map)) {          # Look for location of second cluster
+              for (n in 1:ncol(cluster_map)) {
+                if (j == cluster_map[m, n] & !is.na(cluster_map[m, n])) {
+                  
+                  # Function to get the distance
+                  
+                  vertical <- abs(m - k)
+                  horizontal <- abs(n - l)
+                  distance <- sqrt(horizontal^2 + vertical^2)
+                  
+                  cluster_dis[i, j] <- round(distance, digits = 3)
+                }
+              }
+            }
+            
+          }
+        }
+      }
+      
+    }
+  }
+  diag(cluster_dis) <- 0
+  
+  # Cluster data for reference
   
   cluster_data <- data.frame(cluster = cluster_no,
                              vaccine = cluster_vstatus,
@@ -238,11 +229,6 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
                              cluster_dis)
   colnames(cluster_data) <- c("cluster", "vaccine", "pop",
                               paste0("dis_", cluster_no))
-  
-  # Histogram of populations
-  
-  cluster_pop <- hist(cluster_n, main = "Histogram of clusters' population",
-                      xlab = "Clusters' population", ylab = "Frequency of clusters")
   
   # Cluster map
   
@@ -800,21 +786,25 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
   
   ## Returned objects
   
-  name_simulation <- paste0("N=", N, " C=", C, " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
+  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd,
+                            " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
-  other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death, " R0=", R0, " DurationInf=", dur_inf, " YearsEq=", years1, " YearsVax=", years2)
+  other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
+                                  " R0=", R0, " DurationInf=", dur_inf, " ImpRate=", imp_rate,
+                                  " ProbSymp=", p_sym, " ProbTest=", p_test, " ProbPos=", p_positive,
+                                  " YearsEq=", years1, " YearsVax=", years2)
   
-  list <- list(name_simulation,
-               other_characteristics,
-               cluster_data,
-               cluster_pop,
-               cluster_pop_map,
-               sir_vax_plot,
-               output_direct,
-               output_indirect,
-               output_overall,
-               output_total,
-               poisson_summary
+  list <- list(name_simulation = name_simulation,
+               other_characteristics = other_characteristics,
+               cluster_data = cluster_data,
+               cluster_pop = cluster_n,
+               cluster_pop_map = cluster_pop_map,
+               sir_vax_plot = sir_vax_plot,
+               output_direct = output_direct,
+               output_indirect = output_indirect,
+               output_overall = output_overall,
+               output_total = output_total,
+               poisson_summary = poisson_summary
   )
 
   list
@@ -823,142 +813,74 @@ main <- function(N, C, cluster_no, cluster_dis, # Cluster characteristics
 
 
 
-
-
-  
-  
-  
-
-
-
-
-
-
-# CRT: SIMULATIONS --------------------------------------------------------
-
-
-#### Save cluster details #### 
-
-library(here)
-library(openxlsx)
-library(forcats)
-
-dir.create(here("Results"),recursive = TRUE)
-dir.create(here("Results/2step_simulation_nocompeting"),recursive = TRUE)
-
-# Save the cluster data
-
-write.xlsx(as.data.frame(cluster_map), rowNames = TRUE,
-           "Results/2step_simulation_nocompeting/Cluster_map.xlsx")
-
-png("Results/2step_simulation_nocompeting/Cluster_populations.png",
-    width = 10, height = 6, units = 'in', res = 600)
-hist(cluster_n, main = "Histogram of clusters' population",
-     xlab = "Clusters' population", ylab = "Frequency of clusters")
-dev.off()
-
-png("Results/2step_simulation_nocompeting/Cluster_map.png",
-    width = 10, height = 12, units = 'in', res = 600)
-ggplot(data = data.frame(number = cluster_no, pop = cluster_n, vax = cluster_vstatus)) +
-  geom_point(aes(x = pop, y = vax, color = as.factor(vax)), size = rel(30)) +
-  geom_label(aes(x = pop, y = vax, label = pop, color = as.factor(vax)), size = rel(8)) +
-  xlim(c(0.8*mean(cluster_n), 1.2*mean(cluster_n))) +
-  ylim(c(-2, 3)) +
-  theme_classic() +
-  labs(x = "Cluster population",
-       y = NULL) +
-  scale_color_manual(name = "Cluster vaccination status",
-                     labels=c("Non-vaccinated", "Vaccinated"),
-                     values = c("firebrick", "limegreen")) +
-  theme(
-    axis.title.x = element_text(size = rel(1.1), face="bold"),
-    axis.title.y = element_text(size = rel(1.1), face="bold"),
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_text(size = rel(1), face="bold"),
-    legend.text = element_text(size=rel(1))) +
-  facet_wrap(~fct_relevel(as.character(number), as.character(cluster_map)),
-             ncol = sqrt(C), nrow = sqrt(C))
-dev.off()
+# SIMULATIONS -------------------------------------------------------------
 
 
 #### Run simulations ####
 
 # With these characteristics
 
-R0
-p_vax 
-vax_eff
 N
 C
+sd
+vax_eff
+p_vax
+p_clusvax
 
-# Equilibrium
+# Run
 
-equilibrium <- equilibrium(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
-                           cluster_vstatus = cluster_vstatus, cluster_dis = cluster_dis,
-                           incidence = incidence, birth = birth, death = death,
-                           R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
-                           time_step = time_step, years = 5)
-
-# Check results of equilibrium
-
-equilibrium[[1]]
-
-result_equilibrium <- equilibrium[[2]]
-
-# Run the vaccine model
-
-test <- sir_many(N = N, C = C, cluster_no = cluster_no, cluster_n = cluster_n,
-                cluster_vstatus = cluster_vstatus, cluster_dis = cluster_dis,
-                R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
-                p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
-                p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-                birth = birth, death = death,
-                time_step = time_step, years = 2,
-                equilibrium_result = result_equilibrium, n_runs = 10)
-
-# Graph
-
-plot_sir <- sir_graph(test, cluster_map)
-
-# Get summary numbers
-
-summary_sir <- sir_summary(test, n_runs = 10)
-
-# Poisson regression
-
-direct_effect <- sir_direct(summary_sir, n_runs = 10)
-indirect_effect <- sir_indirect(summary_sir, n_runs = 10)
-total_effect <- sir_total(summary_sir, n_runs = 10)
-overall_effect <- sir_overall(summary_sir, n_runs = 10)
+run <- main(N = N, C = C, sd = sd,
+            incidence = incidence, birth = birth, death = death,
+            R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
+            p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
+            p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+            years1 = 1, years2 = 1, n_runs = 2)
 
 
-#### Save results ####
+#### Save results #### 
+
+library(here)
+library(openxlsx)
+
+dir.create(here("Results"),recursive = TRUE)
+dir.create(here("Results/", Sys.Date()),recursive = TRUE)
 
 # Give name to simulation
 
-characteristics <- "N=200k C=100 sd=100 R0=2 Cover=0.8 VE=0.8"
+name <- run[[1]]
 
-dir.create(here(paste0("Results/2step_simulation_nocompeting/", characteristics)),recursive = TRUE)
+dir.create(here(paste0("Results/", Sys.Date(), "/", name)),recursive = TRUE)
 
 # Save
 
-png(paste0("Results/2step_simulation_nocompeting/", characteristics,"/SIR_equilibrium.png"),
-    width = 20, height = 12, units = 'in', res = 600)
-equilibrium[[1]]
+write.table(run[[2]], file = paste0("Results/", Sys.Date(), "/", name,"/characteristics.txt"))
+
+write.xlsx(as.data.frame(run[[3]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Cluster_Data.xlsx"))
+
+png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Pop_Hist.png"),
+    width = 9, height = 5, units = 'in', res = 600)
+hist(run[[4]], main = "Histogram of clusters' population",
+     xlab = "Clusters' population", ylab = "Frequency of clusters")
 dev.off()
 
-png(paste0("Results/2step_simulation_nocompeting/", characteristics,"/SIR_after_vax.png"),
-    width = 20, height = 12, units = 'in', res = 600)
-plot_sir
+png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Map.png"),
+    width = 9, height = 8, units = 'in', res = 600)
+run[[5]]
 dev.off()
 
-write.xlsx(as.data.frame(direct_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Direct_Effect.xlsx"))
-write.xlsx(as.data.frame(indirect_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Indirect_Effect.xlsx"))
-write.xlsx(as.data.frame(total_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Total_Effect.xlsx"))
-write.xlsx(as.data.frame(overall_effect), rowNames = TRUE,
-           paste0("Results/2step_simulation_nocompeting/", characteristics,"/Overall_Effect.xlsx"))
+png(paste0("Results/", Sys.Date(), "/", name,"/SIR_after_vax.png"),
+    width = 14, height = 9, units = 'in', res = 600)
+run[[6]]
+dev.off()
+
+write.xlsx(as.data.frame(run[[7]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Direct_Effect.xlsx"))
+write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Indirect_Effect.xlsx"))
+write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Overall_Effect.xlsx"))
+write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Total_Effect.xlsx"))
+write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Summary_Effects.xlsx"))
