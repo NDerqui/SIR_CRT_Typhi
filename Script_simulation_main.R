@@ -439,8 +439,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir[i, 22, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j]), digits = 0) 
         
         # Model equations
-        sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + round(sir[i, 22, j]*(1-p_vax), digits = 0)
-        sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + round(sir[i, 22, j]*(p_vax), digits = 0)
+        if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
+          
+          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + round(sir[i, 22, j]*(1-p_vax), digits = 0)
+          sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + round(sir[i, 22, j]*(p_vax), digits = 0)
+        
+        } else {                   # In non-vaccine clusters, all births go to S
+          
+          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j]
+        }
         sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]
         sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]
         sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
