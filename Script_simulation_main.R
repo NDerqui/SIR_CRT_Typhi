@@ -86,7 +86,7 @@ N <- 200000               # Total population in the study
 C <- 100                  # Number of clusters
 sd <- 100                 # Variance in cluster populations
 
-random_cluster <- 0
+random_cluster <- 1
 
 # If 1 the first 50 clusters are vaccinated, but randomly distributed in map
 # If 0 the vaccine clusters are allocated like a chessboard
@@ -577,7 +577,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       legend.position = "bottom",
       legend.text = element_text(size=rel(1))) +
     facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
-               ncol = sqrt(C), nrow = sqrt(C))
+                ncol = nrow(cluster_map))
   
   # Summarize the results
   
