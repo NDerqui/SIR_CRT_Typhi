@@ -130,13 +130,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   if (random_cluster == 1) {
     
     # Cluster map
-    # Random location of clusters
+    # Location of clusters is not random, follows the order
     
     if (sqrt(C) %% 1 == 0) {
-      cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
+      cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
                             dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
     } else {
-      cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+      cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
                             ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
                             dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
     }
@@ -144,13 +144,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     # Vaccination status of clusters
     # Vaccination of the first half of clusters (randmly located)
     
-    V <- C*p_clusvax                    
-    
-    if (C %% 2 == 0) {
-      cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
-    } else {
-      cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) 
-    }
+    cluster_vstatus <- rbinom(n = C, size = 1, prob = p_clusvax)
     
   } else {
     
@@ -168,9 +162,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Vaccination status of clusters
     # Vaccination like a chessboard
-    
-    V <- C*p_clusvax                      
-    
+     
     if (nrow(cluster_map) %% 2 == 0) {
       cluster_vstatus <- rep(c(rep(c(0,1), times = nrow(cluster_map)/2),
                                rep(c(1,0), times = nrow(cluster_map)/2)),
@@ -590,11 +582,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   summary <- sir_output %>%
     group_by(run, cluster) %>%
-    mutate(sum_SI = sum(inc_sus_inf)) %>%
-    mutate(sum_VI = sum(inc_vax_inf)) %>%
+    mutate(sum_SI = inc_sus_inf) %>%
+    mutate(sum_VI = inc_vax_inf) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
-    filter(row_number() == 1) %>%
-    select(-time_seq, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    select(-infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
   
   
@@ -608,11 +599,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
-    select(run, cluster, vaccine, sum_SI, sum_VI) %>%
+    select(run, cluster, time_seq, vaccine, sum_SI, sum_VI) %>%
     
     # Pivot to get the incidence SI vs VI only
-    pivot_longer(-c(run, cluster, vaccine),
-                 names_to = "vax_incluster", values_to = "incidence")
+    pivot_longer(-c(run, cluster, time_seq, vaccine),
+                 names_to = "vax_incluster", values_to = "incidence") %>%
+    
+    # Change names
+    mutate(vax_incluster = case_when(vax_incluster == "sum_VI" ~ 1,
+                                     vax_incluster == "sum_SI" ~ 0))
   
   # Output vector to store the results of the test
   
@@ -620,7 +615,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = incidence ~ vax_incluster,
+    model <- glm(formula = incidence ~ vax_incluster + time_seq,
                  family = "poisson", data = filter(sir_direct, run == i))
     
     # Do the robust standard errors
@@ -652,7 +647,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   sir_indirect <- summary %>%
       
     # Focus therefore only on incidence S to I
-    select(run, cluster, vaccine, sum_SI) 
+    select(run, cluster, time_seq, vaccine, sum_SI) 
     
   # Output vector to store the results of the test
     
@@ -660,7 +655,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
   for (i in 1:n_runs) {
       
-  model <- glm(formula = sum_SI ~ vaccine,
+  model <- glm(formula = sum_SI ~ vaccine + time_seq,
                family = "poisson", data = filter(sir_indirect, run == i))
       
     # Do the robust standard errors
@@ -690,7 +685,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
     
   sir_total <- summary %>%
-      select(run, cluster, vaccine, sum_SI, sum_VI, sum_all_inc) %>%
+      select(run, cluster, time_seq, vaccine, sum_SI, sum_VI, sum_all_inc) %>%
       
       # Get one var with VI only from vaccine clusters,
       # and all incidence from non-vaccine
@@ -703,7 +698,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
   for (i in 1:n_runs) {
       
-    model <- glm(formula = incidence ~ vaccine,
+    model <- glm(formula = incidence ~ vaccine + time_seq,
                  family = "poisson", data = filter(sir_total, run == i))
       
     # Do the robust standard errors
@@ -735,7 +730,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
  sir_overall <- summary %>%
       
     # We are interested in overall incidence
-    select(run, cluster, vaccine, sum_all_inc)
+    select(run, cluster, time_seq, vaccine, sum_all_inc)
     
   # Output vector to store the results of the test
     
@@ -743,7 +738,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     for (i in 1:n_runs) {
       
-      model <- glm(formula = sum_all_inc ~ vaccine,
+      model <- glm(formula = sum_all_inc ~ vaccine + time_seq,
                    family = "poisson", data = filter(sir_overall, run == i))
       
       # Do the robust standard errors
