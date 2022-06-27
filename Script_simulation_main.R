@@ -22,6 +22,7 @@ library(sandwich)
 library(lmtest)
 library(forcats)
 library(DescTools)
+library(svMisc)
 
 
 
@@ -246,7 +247,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       strip.text.x = element_text(size = rel(2))) +
     facet_wrap(~ fct_relevel(as.character(number), as.character(cluster_map)),
                  ncol = nrow(cluster_map)) 
-  cluster_pop_map
+
   
   
   ## For several simulations
@@ -295,16 +296,16 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Put the model to run
     
-    for (j in 1:C) {
+    for (j in sample(1:C)) {
       
       for (i in 2:length(time_seq1)) {
         
         # From S to I
         
         sir_first[i, 8, j] = beta*sir_first[i-1, 6, j]/sir_first[i-1, 4, j]     # Initial FOI: from cluster
-        for (k in 1:C) {                                                        # Loop to add external FOI
+        for (k in sample(1:C)) {                                                # Loop to add external FOI
           if (k != j) {
-            sir_first[i, 8, j] = sir_first[i, 8, j] + (imp_rate/cluster_dis[k,j])*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
+            sir_first[i, 8, j] = sir_first[i, 8, j] + (imp_rate/cluster_dis[j,k])*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
           }
         }
         sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
@@ -339,7 +340,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     #  Store the results: input the last row for the vaccine simulation
     
     equilibrium_result <- as.data.frame(matrix(0, nrow = C, ncol = 18))
-    
+    colnames(equilibrium_result) <- names_column1
     for (i in 1:C) {
       equilibrium_result[i, ] <- sir_first[length(time_seq1), , i]         
     }
@@ -392,16 +393,16 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Put the model to run
     
-    for (j in 1:C) {
+    for (j in sample(1:C)) {
       
       for (i in 2:length(time_seq2)) {
         
         # From S to I
         
         sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
-        for (k in 1:C) { 
+        for (k in sample(1:C)) { 
           if (k != j) {
-            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[k,j])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
+            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[j,k])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
           }
         }
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
@@ -530,6 +531,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       select("run", "cluster", "vaccine", "time_seq",
              "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
       arrange(run, cluster, time_seq)
+    
+    
+    ## Progress
+    
+    progress(value = n, max.value = n_runs,
+             progress.bar = TRUE)
+    Sys.sleep(0.01)
+    
+    if (n == n_runs) {cat("Simulations done!\n")}
     
   }
   
@@ -788,11 +798,11 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd,
+  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " ImpRate=", imp_rate,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
-                                  " R0=", R0, " DurationInf=", dur_inf, " ImpRate=", imp_rate,
+                                  " R0=", R0, " DurationInf=", dur_inf, 
                                   " ProbSymp=", p_sym, " ProbTest=", p_test, " ProbPos=", p_positive,
                                   " YearsEq=", years1, " YearsVax=", years2)
   
@@ -836,7 +846,7 @@ run <- main(N = N, C = C, sd = sd,
             R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
             p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
             p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-            years1 = 1, years2 = 1, n_runs = 2)
+            years1 = 5, years2 = 2, n_runs = 10)
 
 
 #### Save results #### 
@@ -844,7 +854,6 @@ run <- main(N = N, C = C, sd = sd,
 library(here)
 library(openxlsx)
 
-dir.create(here("Results"),recursive = TRUE)
 dir.create(here("Results/", Sys.Date()),recursive = TRUE)
 
 # Give name to simulation
