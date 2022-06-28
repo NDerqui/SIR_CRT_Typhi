@@ -143,9 +143,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     }
     
     # Vaccination status of clusters
-    # Vaccination of the first half of clusters (randmly located)
+    # Vaccination of the first half of clusters (randomly located)
     
-    cluster_vstatus <- rbinom(n = C, size = 1, prob = p_clusvax)
+    V <- C*p_clusvax  
+    
+    if (C %% 2 == 0) {
+      cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
+    } else {
+      cluster_vstatus <- c(rep(1, times = V+1), rep(0, times = V)) 
+    }
     
   } else {
     
