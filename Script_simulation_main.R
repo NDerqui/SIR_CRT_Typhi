@@ -131,10 +131,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   if (random_cluster == 1) {
     
     # Cluster map
-    # Location of clusters is not random, follows the order
+    # Random location of clusters
     
     if (sqrt(C) %% 1 == 0) {
-      cluster_map <- matrix(cluster_no, ncol = sqrt(C), nrow = sqrt(C),
+      cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
                             dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
     } else {
       cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
