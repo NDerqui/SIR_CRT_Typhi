@@ -302,7 +302,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[i, 8, j] = beta*sir_first[i-1, 6, j]/sir_first[i-1, 4, j]     # Initial FOI: from cluster
       for (k in sample(1:C)) {                                                # Loop to add external FOI
         if (k != j) {
-          sir_first[i, 8, j] = sir_first[i, 8, j] + (imp_rate/cluster_dis[j,k])*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
+          sir_first[i, 8, j] = sir_first[i, 8, j] + (imp_rate/(cluster_dis[j,k]*10))*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
         }
       }
       sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
@@ -436,7 +436,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
         for (k in sample(1:C)) { 
           if (k != j) {
-            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/cluster_dis[j,k])*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
+            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/(cluster_dis[j,k]*10))*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
           }
         }
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
