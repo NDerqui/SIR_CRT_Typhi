@@ -97,13 +97,13 @@ random_cluster <- 1
 # FUNCTION -------------------------------------------------------------
 
 
-main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
-                 incidence, birth, death,       # Incidence, birth and death rate
-                 R0, dur_inf, per_local,        # Infection parameters & % of local trans
-                 p_vax, p_clusvax, vax_eff,     # Vaccination parameters
-                 p_sym, p_test, p_positive,     # Observed infections
-                 time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
-                 n_runs) {   
+simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
+                   incidence, birth, death,       # Incidence, birth and death rate
+                   R0, dur_inf, per_local,        # Infection parameters & % of local trans
+                   p_vax, p_clusvax, vax_eff,     # Vaccination parameters
+                   p_sym, p_test, p_positive,     # Observed infections
+                   time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
+                   n_runs) {   
   
   
   ## Considerations
@@ -915,7 +915,7 @@ p_clusvax
 
 run <- main(N = N, C = C, sd = sd,
             incidence = incidence, birth = birth, death = death,
-            R0 = R0, dur_inf = dur_inf, per_local = per_local,
+            R0 = R0, dur_inf = dur_inf, inter_cluster = inter_cluster,
             p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
             p_sym = p_sym, p_test = p_test, p_positive = p_positive,
             years1 = 5, years2 = 2, n_runs = 10)
