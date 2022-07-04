@@ -868,7 +868,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " InterCluster=", inter_cluster,
+  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " PerLocal=", per_local,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -915,7 +915,7 @@ p_clusvax
 
 run <- main(N = N, C = C, sd = sd,
             incidence = incidence, birth = birth, death = death,
-            R0 = R0, dur_inf = dur_inf, inter_cluster = inter_cluster,
+            R0 = R0, dur_inf = dur_inf, per_local = per_local,
             p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
             p_sym = p_sym, p_test = p_test, p_positive = p_positive,
             years1 = 5, years2 = 2, n_runs = 10)
