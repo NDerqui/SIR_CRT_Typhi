@@ -57,12 +57,12 @@ death <- 0.007        # 7 per 1,000
 
 # (infections/time): beta = R0/Duration of infectiousness
 
-R0 <- 2            # Basic reproduction number
+R0 <- 1.5          # Basic reproduction number
 dur_inf <- 7       # Duration of infectiousness (days)
 
 # Importation rate: from external clusters to a given one (??)
 
-imp_rate <- 0.5
+inter_cluster <- 1
 
 
 #### Vaccination ####
@@ -99,7 +99,7 @@ random_cluster <- 1
 
 main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
                  incidence, birth, death,       # Incidence, birth and death rate
-                 R0, dur_inf, imp_rate,         # Infection parameters
+                 R0, dur_inf, inter_cluster,    # Infection parameters
                  p_vax, p_clusvax, vax_eff,     # Vaccination parameters
                  p_sym, p_test, p_positive,     # Observed infections
                  time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
@@ -302,7 +302,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[i, 8, j] = beta*sir_first[i-1, 6, j]/sir_first[i-1, 4, j]     # Initial FOI: from cluster
       for (k in sample(1:C)) {                                                # Loop to add external FOI
         if (k != j) {
-          sir_first[i, 8, j] = sir_first[i, 8, j] + (imp_rate/(cluster_dis[j,k]*10))*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
+          sir_first[i, 8, j] = sir_first[i, 8, j] + (inter_cluster/(cluster_dis[j,k]*10))*beta*sir_first[i-1, 6, k]/sir_first[i-1, 4 ,k] 
         }
       }
       sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
@@ -374,7 +374,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   ## Step 2: vaccine introduction
   
   sir_output <- data.frame(cluster = 0, vaccine = 0, time_seq = 0,
-                           infected = 0, observed = 0,
+                           total = 0, infected = 0, observed = 0,
                            inc_sus_inf = 0, inc_vax_inf = 0, run = 0)
   
   
@@ -436,7 +436,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
         for (k in sample(1:C)) { 
           if (k != j) {
-            sir[i, 9, j] = sir[i, 9, j] + (imp_rate/(cluster_dis[j,k]*10))*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
+            sir[i, 9, j] = sir[i, 9, j] + (inter_cluster/(cluster_dis[j,k]*10))*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
           }
         }
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
@@ -484,6 +484,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Store the results
     
+    ## Total N in each cluster
+    sir_res_total <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
+    colnames(sir_res_total) <- names_matrix2
+    for (i in 1:C) {
+      sir_res_total[,i] <- sir[,4,i]         
+    }
+    
     ## Infected
     sir_res_infected <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_infected) <- names_matrix2
@@ -513,6 +520,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     }
     
     ## Pivot the results and merge all together
+    sir_res_total <- sir_res_total %>%
+      mutate(time_seq = time_seq2) %>%
+      pivot_longer(-time_seq, names_to = "cluster", values_to = "total") %>%
+      mutate(cluster = readr::parse_number(cluster)) %>%
+      arrange(cluster) %>%
+      merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+      select(c("cluster", "vaccine", "time_seq", "total"))
     sir_res_infected <- sir_res_infected %>%
       mutate(time_seq = time_seq2) %>%
       pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
@@ -542,7 +556,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
       select(c("cluster", "vaccine", "time_seq", "inc_vax_inf"))
     
-    sir_result <- merge(sir_res_infected, sir_res_observed,
+    sir_result <- merge(sir_res_total, sir_res_infected,
+                        by = c("cluster", "vaccine", "time_seq"), all = TRUE)
+    sir_result <- merge(sir_result, sir_res_observed,
                         by = c("cluster", "vaccine", "time_seq"), all = TRUE)
     sir_result <- merge(sir_result, sir_res_inc_SI,
                         by = c("cluster", "vaccine", "time_seq"), all = TRUE)
@@ -557,12 +573,12 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       mutate(run = n)
     
     sir_output <- merge(sir_output, sir_result,
-                        by = c("cluster", "vaccine", "time_seq", "infected",
-                               "observed", "inc_sus_inf", "inc_vax_inf", "run"),
+                        by = c("cluster", "vaccine", "time_seq", "total",
+                               "infected", "observed", "inc_sus_inf", "inc_vax_inf", "run"),
                         all = TRUE)
     
     sir_output <- sir_output %>%
-      select("run", "cluster", "vaccine", "time_seq",
+      select("run", "cluster", "vaccine", "time_seq", "total",
              "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
       arrange(run, cluster, time_seq)
     
@@ -626,6 +642,34 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   summary <- sir_output %>%
     group_by(run, cluster) %>%
+    mutate(sum_SI = sum(inc_sus_inf)) %>%
+    mutate(sum_VI = sum(inc_vax_inf)) %>%
+    mutate(sum_all_inc = sum_SI + sum_VI) %>%
+    filter(row_number() == 1) %>%
+    select(-total, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    ungroup() %>%
+    group_by(run, vaccine) %>%
+    mutate(Sum_Vax_clusters_SI = case_when(vaccine == 1 ~ sum(sum_SI))) %>%
+    mutate(Sum_Vax_clusters_VI = case_when(vaccine == 1 ~ sum(sum_VI))) %>%
+    mutate(Sum_NoVax_clusters_SI = case_when(vaccine == 0 ~ sum(sum_SI))) %>%
+    mutate(Sum_Vax_clusters_all = case_when(vaccine == 1 ~ sum(sum_all_inc))) %>%
+    mutate(Sum_NoVax_clusters_all = case_when(vaccine == 0 ~ sum(sum_all_inc))) %>%
+    filter(row_number() == 1) %>%
+    select(-cluster, -time_seq, -sum_SI, -sum_VI, -sum_all_inc) %>%
+    ungroup() %>%
+    group_by(vaccine) %>%
+    mutate(Sum_Vax_clusters_SI = mean(Sum_Vax_clusters_SI)) %>%
+    mutate(Sum_Vax_clusters_VI = mean(Sum_Vax_clusters_VI)) %>%
+    mutate(Sum_NoVax_clusters_SI = mean(Sum_NoVax_clusters_SI)) %>%
+    mutate(Sum_Vax_clusters_all = mean(Sum_Vax_clusters_all)) %>%
+    mutate(Sum_NoVax_clusters_all = mean(Sum_NoVax_clusters_all)) %>%
+    filter(row_number() == 1) %>%
+    select(-run) %>%
+    ungroup()
+  rownames(summary) <- c("Mean_Runs_Vax", "Mean_Runs_NoVax")
+    
+  for_poisson <- sir_output %>%
+    group_by(run, cluster) %>%
     mutate(sum_SI = inc_sus_inf) %>%
     mutate(sum_VI = inc_vax_inf) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
@@ -639,14 +683,14 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Direct effect: vax vs unvax in vaccine cluster
   
-  sir_direct <- summary %>%
+  sir_direct <- for_poisson %>%
     
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
-    select(run, cluster, time_seq, vaccine, sum_SI, sum_VI) %>%
+    select(run, cluster, time_seq, vaccine, total, sum_SI, sum_VI) %>%
     
     # Pivot to get the incidence SI vs VI only
-    pivot_longer(-c(run, cluster, time_seq, vaccine),
+    pivot_longer(-c(run, cluster, time_seq, vaccine, total),
                  names_to = "vax_incluster", values_to = "incidence") %>%
     
     # Change names
@@ -659,7 +703,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = incidence ~ vax_incluster + time_seq,
+    model <- glm(formula = (incidence/total) ~ vax_incluster + time_seq,
                  family = "poisson", data = filter(sir_direct, run == i))
     
     # Do the robust standard errors
@@ -688,10 +732,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
 
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
     
-  sir_indirect <- summary %>%
+  sir_indirect <- for_poisson %>%
       
     # Focus therefore only on incidence S to I
-    select(run, cluster, time_seq, vaccine, sum_SI) 
+    select(run, cluster, time_seq, vaccine, sum_SI, total) 
     
   # Output vector to store the results of the test
     
@@ -699,7 +743,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
   for (i in 1:n_runs) {
       
-  model <- glm(formula = sum_SI ~ vaccine + time_seq,
+  model <- glm(formula = (sum_SI/total) ~ vaccine + time_seq,
                family = "poisson", data = filter(sir_indirect, run == i))
       
     # Do the robust standard errors
@@ -728,8 +772,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
     
-  sir_total <- summary %>%
-      select(run, cluster, time_seq, vaccine, sum_SI, sum_VI, sum_all_inc) %>%
+  sir_total <- for_poisson %>%
+      select(run, cluster, time_seq, vaccine, total, sum_SI, sum_VI, sum_all_inc) %>%
       
       # Get one var with VI only from vaccine clusters,
       # and all incidence from non-vaccine
@@ -742,7 +786,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
   for (i in 1:n_runs) {
       
-    model <- glm(formula = incidence ~ vaccine + time_seq,
+    model <- glm(formula = (incidence/total) ~ vaccine + time_seq,
                  family = "poisson", data = filter(sir_total, run == i))
       
     # Do the robust standard errors
@@ -771,10 +815,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
  # Overall effect: all in vaccine cluster vs all in non-vaccine
     
- sir_overall <- summary %>%
+ sir_overall <- for_poisson %>%
       
     # We are interested in overall incidence
-    select(run, cluster, time_seq, vaccine, sum_all_inc)
+    select(run, cluster, time_seq, vaccine, total, sum_all_inc)
     
   # Output vector to store the results of the test
     
@@ -782,7 +826,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     for (i in 1:n_runs) {
       
-      model <- glm(formula = sum_all_inc ~ vaccine + time_seq,
+      model <- glm(formula = (sum_all_inc/total) ~ vaccine + time_seq,
                    family = "poisson", data = filter(sir_overall, run == i))
       
       # Do the robust standard errors
@@ -832,7 +876,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " ImpRate=", imp_rate,
+  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " InterCluster=", inter_cluster,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -851,7 +895,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                output_indirect = output_indirect,
                output_overall = output_overall,
                output_total = output_total,
-               poisson_summary = poisson_summary
+               poisson_summary = poisson_summary,
+               summary_infections = summary
   )
 
   list
@@ -878,7 +923,7 @@ p_clusvax
 
 run <- main(N = N, C = C, sd = sd,
             incidence = incidence, birth = birth, death = death,
-            R0 = R0, dur_inf = dur_inf, imp_rate = imp_rate,
+            R0 = R0, dur_inf = dur_inf, inter_cluster = inter_cluster,
             p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
             p_sym = p_sym, p_test = p_test, p_positive = p_positive,
             years1 = 5, years2 = 2, n_runs = 10)
@@ -926,12 +971,14 @@ run[[7]]
 dev.off()
 
 write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
-           paste0("Results/", Sys.Date(), "/", name,"/Direct_Effect.xlsx"))
+           paste0("Results/", Sys.Date(), "/", name,"/Effect_Direct.xlsx"))
 write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
-           paste0("Results/", Sys.Date(), "/", name,"/Indirect_Effect.xlsx"))
+           paste0("Results/", Sys.Date(), "/", name,"/Effect_Indirect.xlsx"))
 write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
-           paste0("Results/", Sys.Date(), "/", name,"/Overall_Effect.xlsx"))
+           paste0("Results/", Sys.Date(), "/", name,"/Effect_Overall.xlsx"))
 write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
-           paste0("Results/", Sys.Date(), "/", name,"/Total_Effect.xlsx"))
+           paste0("Results/", Sys.Date(), "/", name,"/Effect_Total.xlsx"))
 write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Summary_Effects.xlsx"))
+write.xlsx(as.data.frame(run[[13]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
