@@ -915,7 +915,7 @@ p_clusvax
 
 run <- simple(N = N, C = C, sd = sd,
               incidence = incidence, birth = birth, death = death,
-              R0 = R0, dur_inf = dur_inf, inter_cluster = inter_cluster,
+              R0 = R0, dur_inf = dur_inf, per_local = per_local,
               p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
               p_sym = p_sym, p_test = p_test, p_positive = p_positive,
               years1 = 5, years2 = 2, n_runs = 10)
