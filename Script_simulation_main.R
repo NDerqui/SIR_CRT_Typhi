@@ -57,10 +57,10 @@ death <- 0.007        # 7 per 1,000
 
 # (infections/time): beta = R0/Duration of infectiousness
 
-R0 <- 1.5          # Basic reproduction number
+R0 <- 1.8          # Basic reproduction number
 dur_inf <- 7       # Duration of infectiousness (days)
 
-# Importation rate: from external clusters to a given one (??)
+# Switch: for intercluster transmission
 
 inter_cluster <- 1
 
