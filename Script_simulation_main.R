@@ -374,7 +374,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   ## Step 2: vaccine introduction
   
   sir_output <- data.frame(cluster = 0, vaccine = 0, time_seq = 0,
-                           total = 0, infected = 0, observed = 0,
+                           susceptible = 0, vaccinated = 0, infected = 0, observed = 0,
                            inc_sus_inf = 0, inc_vax_inf = 0, run = 0)
   
   
