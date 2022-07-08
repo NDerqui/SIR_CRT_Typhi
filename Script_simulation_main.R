@@ -484,11 +484,18 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Store the results
     
-    ## Total N in each cluster
-    sir_res_total <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
-    colnames(sir_res_total) <- names_matrix2
+    ## Total S in each cluster
+    sir_res_susceptible <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
+    colnames(sir_res_susceptible) <- names_matrix2
     for (i in 1:C) {
-      sir_res_total[,i] <- sir[,4,i]         
+      sir_res_susceptible[,i] <- sir[,5,i]         
+    }
+    
+    ## Total V in each cluster
+    sir_res_vaccinated <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
+    colnames(sir_res_vaccinated) <- names_matrix2
+    for (i in 1:C) {
+      sir_res_vaccinated[,i] <- sir[,6,i]         
     }
     
     ## Infected
@@ -520,13 +527,20 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     }
     
     ## Pivot the results and merge all together
-    sir_res_total <- sir_res_total %>%
+    sir_res_susceptible <- sir_res_susceptible %>%
       mutate(time_seq = time_seq2) %>%
-      pivot_longer(-time_seq, names_to = "cluster", values_to = "total") %>%
+      pivot_longer(-time_seq, names_to = "cluster", values_to = "susceptible") %>%
       mutate(cluster = readr::parse_number(cluster)) %>%
       arrange(cluster) %>%
       merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
-      select(c("cluster", "vaccine", "time_seq", "total"))
+      select(c("cluster", "vaccine", "time_seq", "susceptible"))
+    sir_res_vaccinated <- sir_res_vaccinated %>%
+      mutate(time_seq = time_seq2) %>%
+      pivot_longer(-time_seq, names_to = "cluster", values_to = "vaccinated") %>%
+      mutate(cluster = readr::parse_number(cluster)) %>%
+      arrange(cluster) %>%
+      merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
+      select(c("cluster", "vaccine", "time_seq", "vaccinated"))
     sir_res_infected <- sir_res_infected %>%
       mutate(time_seq = time_seq2) %>%
       pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
@@ -556,7 +570,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       merge(y = cluster_data[, c("cluster", "vaccine")], by = "cluster", all = TRUE) %>%
       select(c("cluster", "vaccine", "time_seq", "inc_vax_inf"))
     
-    sir_result <- merge(sir_res_total, sir_res_infected,
+    sir_result <- merge(sir_res_susceptible, sir_res_vaccinated,
+                        by = c("cluster", "vaccine", "time_seq"), all = TRUE)
+    sir_result <- merge(sir_result, sir_res_infected,
                         by = c("cluster", "vaccine", "time_seq"), all = TRUE)
     sir_result <- merge(sir_result, sir_res_observed,
                         by = c("cluster", "vaccine", "time_seq"), all = TRUE)
@@ -573,12 +589,12 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       mutate(run = n)
     
     sir_output <- merge(sir_output, sir_result,
-                        by = c("cluster", "vaccine", "time_seq", "total",
+                        by = c("cluster", "vaccine", "time_seq", "susceptible", "vaccinated",
                                "infected", "observed", "inc_sus_inf", "inc_vax_inf", "run"),
                         all = TRUE)
     
     sir_output <- sir_output %>%
-      select("run", "cluster", "vaccine", "time_seq", "total",
+      select("run", "cluster", "vaccine", "time_seq", "susceptible", "vaccinated",
              "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
       arrange(run, cluster, time_seq)
     
@@ -646,7 +662,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(sum_VI = sum(inc_vax_inf)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
     filter(row_number() == 1) %>%
-    select(-total, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    select(-susceptible, -vaccinated, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup() %>%
     group_by(run, vaccine) %>%
     mutate(Sum_Vax_clusters_SI = case_when(vaccine == 1 ~ sum(sum_SI))) %>%
@@ -658,23 +674,27 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     select(-cluster, -time_seq, -sum_SI, -sum_VI, -sum_all_inc) %>%
     ungroup() %>%
     group_by(vaccine) %>%
-    mutate(Sum_Vax_clusters_SI = mean(Sum_Vax_clusters_SI)) %>%
-    mutate(Sum_Vax_clusters_VI = mean(Sum_Vax_clusters_VI)) %>%
-    mutate(Sum_NoVax_clusters_SI = mean(Sum_NoVax_clusters_SI)) %>%
-    mutate(Sum_Vax_clusters_all = mean(Sum_Vax_clusters_all)) %>%
-    mutate(Sum_NoVax_clusters_all = mean(Sum_NoVax_clusters_all)) %>%
+    mutate(Sum_Vax_clusters_SI = mean(Sum_Vax_clusters_SI, na.rm = TRUE)) %>%
+    mutate(Sum_Vax_clusters_VI = mean(Sum_Vax_clusters_VI, na.rm = TRUE)) %>%
+    mutate(Sum_NoVax_clusters_SI = mean(Sum_NoVax_clusters_SI, na.rm = TRUE)) %>%
+    mutate(Sum_Vax_clusters_all = mean(Sum_Vax_clusters_all, na.rm = TRUE)) %>%
+    mutate(Sum_NoVax_clusters_all = mean(Sum_NoVax_clusters_all, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     select(-run) %>%
     ungroup()
   rownames(summary) <- c("Mean_Runs_Vax", "Mean_Runs_NoVax")
-    
+  
   for_poisson <- sir_output %>%
     group_by(run, cluster) %>%
-    mutate(sum_SI = inc_sus_inf) %>%
-    mutate(sum_VI = inc_vax_inf) %>%
+    mutate(sum_sus = sum(susceptible)) %>%
+    mutate(sum_vax = sum(vaccinated)) %>%
+    mutate(sum_SI = sum(inc_sus_inf)) %>%
+    mutate(sum_VI = sum(inc_vax_inf)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
-    select(-infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
-    ungroup()
+    filter(row_number() == 1) %>%
+    select(-time_seq, -susceptible, -vaccinated,
+           -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    ungroup() 
   
   
   
@@ -687,15 +707,29 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
-    select(run, cluster, time_seq, vaccine, total, sum_SI, sum_VI) %>%
+    select(run, vaccine, sum_sus, sum_vax, sum_SI, sum_VI) %>%
+    
+    # Sum all numbers in a run
+    group_by(run, vaccine) %>%
+    mutate(sum_sus = sum(sum_sus)) %>%
+    mutate(sum_vax = sum(sum_vax)) %>%
+    mutate(sum_SI = sum(sum_SI)) %>%
+    mutate(sum_VI = sum(sum_VI)) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
     
     # Pivot to get the incidence SI vs VI only
-    pivot_longer(-c(run, cluster, time_seq, vaccine, total),
+    pivot_longer(-c(run, vaccine, sum_sus, sum_vax),
                  names_to = "vax_incluster", values_to = "incidence") %>%
-    
     # Change names
     mutate(vax_incluster = case_when(vax_incluster == "sum_VI" ~ 1,
-                                     vax_incluster == "sum_SI" ~ 0))
+                                     vax_incluster == "sum_SI" ~ 0)) %>%
+    
+    # Get the total
+    mutate(total = case_when(vax_incluster == 1 ~ sum_vax,
+                             vax_incluster == 0 ~ sum_sus)) %>%
+    # Clean
+    select(run, vax_incluster, incidence, total)
   
   # Output vector to store the results of the test
   
@@ -703,12 +737,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = (incidence/total) ~ vax_incluster + time_seq,
-                 family = "poisson", data = filter(sir_direct, run == i))
+    model <- glm(formula = (incidence/total) ~ vax_incluster,
+                 family = "poisson",
+                 data = filter(sir_direct, run == i))
     
     # Do the robust standard errors
     
-    robust <- robust <- coeftest(model, vcov. = sandwich)
+    robust <- coeftest(model, vcov. = sandwich)
     
     # Get the coefficients of the model
     
@@ -727,132 +762,173 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   rownames(output_direct) <- paste0("run_", seq(1:n_runs))
   colnames(output_direct) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                              "2.5%", "97.5%")
+                               "2.5%", "97.5%")
   
-
+  
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
-    
+  
   sir_indirect <- for_poisson %>%
-      
+    
     # Focus therefore only on incidence S to I
-    select(run, cluster, time_seq, vaccine, sum_SI, total) 
+    select(run, vaccine, sum_SI, sum_sus) %>%
     
+    # Sum all numbers
+    group_by(run, vaccine) %>%
+    mutate(sum_sus = sum(sum_sus)) %>%
+    mutate(sum_SI = sum(sum_SI)) %>%
+    filter(row_number() == 1) %>%
+    ungroup()
+  
   # Output vector to store the results of the test
-    
+  
   output_indirect <- matrix(0, ncol = 6, nrow = n_runs)
-    
+  
   for (i in 1:n_runs) {
-      
-  model <- glm(formula = (sum_SI/total) ~ vaccine + time_seq,
-               family = "poisson", data = filter(sir_indirect, run == i))
-      
+    
+    model <- glm(formula = (sum_SI/sum_sus) ~ vaccine,
+                 family = "poisson",
+                 data = filter(sir_indirect, run == i))
+    
     # Do the robust standard errors
-      
+    
     robust <- robust <- coeftest(model, vcov. = sandwich)
-      
+    
     # Get the coefficients of the model
-      
+    
     x <- exp(robust[2, 1])
     y <- robust[2, 2:4]
     z <- exp(confint(robust))
-      
+    
     # Store them
-      
+    
     output_indirect[i, 1]   <- x
     output_indirect[i, 2:4] <- y
     output_indirect[i, 5:6] <- z[2,]
   }
-    
+  
   # Clean the result vector
-    
+  
   rownames(output_indirect) <- paste0("run_", seq(1:n_runs))
   colnames(output_indirect) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                          "2.5%", "97.5%")
-
+                                 "2.5%", "97.5%")
+  
   
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
-    
+  
   sir_total <- for_poisson %>%
-      select(run, cluster, time_seq, vaccine, total, sum_SI, sum_VI, sum_all_inc) %>%
-      
-      # Get one var with VI only from vaccine clusters,
-      # and all incidence from non-vaccine
-      mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
-                                   vaccine == 0 ~ sum_all_inc))
     
+    # Select
+    select(run, vaccine, sum_sus, sum_vax, sum_VI, sum_all_inc) %>%
+    
+    # Sum all numbers
+    group_by(run, vaccine) %>%
+    mutate(sum_sus = sum(sum_sus)) %>%
+    mutate(sum_vax = sum(sum_vax)) %>%
+    mutate(sum_VI = sum(sum_VI)) %>%
+    mutate(sum_all_inc = sum(sum_all_inc)) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
+    
+    # Get one var with VI only from vaccine clusters,
+    # and all incidence from non-vaccine
+    mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
+                                 vaccine == 0 ~ sum_all_inc)) %>%
+    # Get total
+    mutate(total = case_when(vaccine == 1 ~ sum_vax,
+                             vaccine == 0 ~ sum_sus)) %>%
+    
+    # Clean
+    select(run, vaccine, incidence, total)
+  
   # Output vector to store the results of the test
-    
+  
   output_total <- matrix(0, ncol = 6, nrow = n_runs)
-    
+  
   for (i in 1:n_runs) {
-      
-    model <- glm(formula = (incidence/total) ~ vaccine + time_seq,
-                 family = "poisson", data = filter(sir_total, run == i))
-      
+    
+    model <- glm(formula = (incidence/total) ~ vaccine,
+                 family = "poisson",
+                 data = filter(sir_total, run == i))
+    
     # Do the robust standard errors
-      
+    
     robust <- robust <- coeftest(model, vcov. = sandwich)
-      
+    
     # Get the coefficients of the model
-      
+    
     x <- exp(robust[2, 1])
     y <- robust[2, 2:4]
     z <- exp(confint(robust))
-      
+    
     # Store them
-      
+    
     output_total[i, 1]   <- x
     output_total[i, 2:4] <- y
     output_total[i, 5:6] <- z[2,]
   }
-    
+  
   # Clean the result vector
-    
+  
   rownames(output_total) <- paste0("run_", seq(1:n_runs))
   colnames(output_total) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                                "2.5%", "97.5%")
-     
+                              "2.5%", "97.5%")
   
- # Overall effect: all in vaccine cluster vs all in non-vaccine
+  
+  # Overall effect: all in vaccine cluster vs all in non-vaccine
+  
+  sir_overall <- for_poisson %>%
     
- sir_overall <- for_poisson %>%
-      
     # We are interested in overall incidence
-    select(run, cluster, time_seq, vaccine, total, sum_all_inc)
+    select(run, vaccine, sum_sus, sum_vax, sum_all_inc) %>%
     
+    # Sum all numbers
+    group_by(run, vaccine) %>%
+    mutate(sum_sus = sum(sum_sus)) %>%
+    mutate(sum_vax = sum(sum_vax)) %>%
+    mutate(sum_all_inc = sum(sum_all_inc)) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
+    
+    # Get total
+    mutate(total = sum_sus + sum_vax) %>%
+    
+    # Clean
+    select(run, vaccine, sum_all_inc, total)
+  
   # Output vector to store the results of the test
-    
+  
   output_overall <- matrix(0, ncol = 6, nrow = n_runs)
+  
+  for (i in 1:n_runs) {
     
-    for (i in 1:n_runs) {
-      
-      model <- glm(formula = (sum_all_inc/total) ~ vaccine + time_seq,
-                   family = "poisson", data = filter(sir_overall, run == i))
-      
-      # Do the robust standard errors
-      
-      robust <- robust <- coeftest(model, vcov. = sandwich)
-      
-      # Get the coefficients of the model
-      
-      x <- exp(robust[2, 1])
-      y <- robust[2, 2:4]
-      z <- exp(confint(robust))
-      
-      # Store them
-      
-      output_overall[i, 1]   <- x
-      output_overall[i, 2:4] <- y
-      output_overall[i, 5:6] <- z[2,]
-   }
+    model <- glm(formula = (sum_all_inc/total) ~ vaccine,
+                 family = "poisson", 
+                 data = filter(sir_overall, run == i))
     
+    # Do the robust standard errors
+    
+    robust <- robust <- coeftest(model, vcov. = sandwich)
+    
+    # Get the coefficients of the model
+    
+    x <- exp(robust[2, 1])
+    y <- robust[2, 2:4]
+    z <- exp(confint(robust))
+    
+    # Store them
+    
+    output_overall[i, 1]   <- x
+    output_overall[i, 2:4] <- y
+    output_overall[i, 5:6] <- z[2,]
+  }
+  
   # Clean the result vector
-    
+  
   rownames(output_overall) <- paste0("run_", seq(1:n_runs))
   colnames(output_overall) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                          "2.5%", "97.5%")
-    
-
+                                "2.5%", "97.5%")
+  
+  
   # Summary of all effects
   
   poisson_summary <- matrix(0, nrow = 4, ncol = 4)
