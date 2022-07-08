@@ -57,7 +57,7 @@ death <- 0.007
 
 # (infections/time): beta = R0/Duration of infectiousness
 
-R0 <- 1.8          # Basic reproduction number
+R0 <- 2            # Basic reproduction number
 dur_inf <- 7       # Duration of infectiousness (days)
 
 # Percentage of local transmission, the rest of global transmission
@@ -730,7 +730,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   for (i in 1:n_runs) {
     
     model <- glm(formula = (incidence/total) ~ vax_incluster,
-                 family = "poisson",
+                 family = "poisson"(link = "log"),
                  data = filter(sir_direct, run == i))
     
     # Do the robust standard errors
@@ -778,7 +778,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   for (i in 1:n_runs) {
       
   model <- glm(formula = (sum_SI/sum_sus) ~ vaccine,
-               family = "poisson",
+               family = "poisson"(link = "log"),
                data = filter(sir_indirect, run == i))
       
     # Do the robust standard errors
@@ -839,7 +839,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   for (i in 1:n_runs) {
       
     model <- glm(formula = (incidence/total) ~ vaccine,
-                 family = "poisson",
+                 family = "poisson"(link = "log"),
                  data = filter(sir_total, run == i))
       
     # Do the robust standard errors
@@ -894,7 +894,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     for (i in 1:n_runs) {
       
       model <- glm(formula = (sum_all_inc/total) ~ vaccine,
-                   family = "poisson", 
+                   family = "poisson"(link = "log"), 
                    data = filter(sir_overall, run == i))
       
       # Do the robust standard errors
