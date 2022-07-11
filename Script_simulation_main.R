@@ -30,9 +30,6 @@ library(svMisc)
 # PARAMETERS --------------------------------------------------------------
 
 
-# Parameters to be explored in the runs
-
-
 #### Incidence, birth and death ####
 
 # Prevalence of infection in India
@@ -49,18 +46,17 @@ birth <- 0.007
 # Death rate
 # The World Bank Data 2020
 
-# death <- 0.007        # 7 per 1,000
 death <- 0.007        # 7 per 1,000
 
 
-#### Force of infection ####
+#### Transmission ####
 
 # (infections/time): beta = R0/Duration of infectiousness
 
 R0 <- 2            # Basic reproduction number
 dur_inf <- 7       # Duration of infectiousness (days)
 
-# Switch: for intercluster transmission
+# Switch: for inter-cluster transmission
 
 inter_cluster <- 1
 
@@ -74,7 +70,7 @@ vax_eff <- 0.7     # Vaccine effectiveness (infection)
 
 #### Detected infections ####
 
-p_sym <- 0.55       # Probability of being symptomatic - CHECK
+p_sym <- 0.50       # Probability of being symptomatic - CHECK
 p_test <- 0.50      # Probability of seeking a test - CHECK
 p_positive <- 0.60  # Probability of test being positive
 
@@ -110,7 +106,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
 
   # Calculated parameters
   
-  beta <- R0/dur_inf                  # Force of infection
+  beta <- R0/dur_inf                  # Transmission rate
   mu <- p_sym*p_test*p_positive       # Prob of detecting I
   
   
@@ -137,7 +133,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       cluster_map <- matrix(sample(cluster_no), ncol = sqrt(C), nrow = sqrt(C),
                             dimnames = list(seq(1:sqrt(C)), seq(1:sqrt(C))))
     } else {
-      cluster_map <- matrix(c(cluster_no, rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
+      cluster_map <- matrix(c(sample(cluster_no), rep(NA, times = (ceiling(sqrt(C))*(floor(sqrt(C))+1) - C))),
                             ncol = ceiling(sqrt(C)), nrow = (floor(sqrt(C)) + 1),
                             dimnames = list(seq(1:(floor(sqrt(C))+1)), seq(1:ceiling(sqrt(C)))))
     }
@@ -433,8 +429,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         
         # From S to I
         
-        sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]
-        for (k in sample(1:C)) { 
+        sir[i, 9, j] = beta*sir[i-1, 7, j]/sir[i-1, 4 ,j]   # Inital FOI from cluster
+        for (k in sample(1:C)) {                            # Loop to add external FOI
           if (k != j) {
             sir[i, 9, j] = sir[i, 9, j] + (inter_cluster/(cluster_dis[j,k]*10))*beta*sir[i-1, 7, k]/sir[i-1, 4 ,k] 
           }
