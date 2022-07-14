@@ -733,7 +733,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = (incidence/total) ~ vax_incluster,
+    model <- glm(formula = as.formula((incidence/total) ~ vax_incluster),
                  family = "poisson"(link = "log"),
                  data = filter(sir_direct, run == i))
     
@@ -781,7 +781,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = (sum_SI/sum_sus) ~ vaccine,
+    model <- glm(formula = as.formula((sum_SI/sum_sus) ~ vaccine),
                  family = "poisson"(link = "log"),
                  data = filter(sir_indirect, run == i))
     
@@ -842,7 +842,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = (incidence/total) ~ vaccine,
+    model <- glm(formula = as.formula((incidence/total) ~ vaccine),
                  family = "poisson"(link = "log"),
                  data = filter(sir_total, run == i))
     
@@ -897,7 +897,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = (sum_all_inc/total) ~ vaccine,
+    model <- glm(formula = as.formula((sum_all_inc/total) ~ vaccine),
                  family = "poisson"(link = "log"), 
                  data = filter(sir_overall, run == i))
     
