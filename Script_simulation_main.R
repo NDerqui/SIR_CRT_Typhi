@@ -654,18 +654,18 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   summary <- sir_output %>%
     group_by(run, cluster) %>%
-    mutate(sum_SI = sum(inc_sus_inf)) %>%
-    mutate(sum_VI = sum(inc_vax_inf)) %>%
+    mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
+    mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
     filter(row_number() == 1) %>%
     select(-susceptible, -vaccinated, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup() %>%
     group_by(run, vaccine) %>%
-    mutate(Sum_Vax_clusters_SI = case_when(vaccine == 1 ~ sum(sum_SI))) %>%
-    mutate(Sum_Vax_clusters_VI = case_when(vaccine == 1 ~ sum(sum_VI))) %>%
-    mutate(Sum_NoVax_clusters_SI = case_when(vaccine == 0 ~ sum(sum_SI))) %>%
-    mutate(Sum_Vax_clusters_all = case_when(vaccine == 1 ~ sum(sum_all_inc))) %>%
-    mutate(Sum_NoVax_clusters_all = case_when(vaccine == 0 ~ sum(sum_all_inc))) %>%
+    mutate(Sum_Vax_clusters_SI = case_when(vaccine == 1 ~ sum(sum_SI, na.rm = TRUE))) %>%
+    mutate(Sum_Vax_clusters_VI = case_when(vaccine == 1 ~ sum(sum_VI, na.rm = TRUE))) %>%
+    mutate(Sum_NoVax_clusters_SI = case_when(vaccine == 0 ~ sum(sum_SI, na.rm = TRUE))) %>%
+    mutate(Sum_Vax_clusters_all = case_when(vaccine == 1 ~ sum(sum_all_inc, na.rm = TRUE))) %>%
+    mutate(Sum_NoVax_clusters_all = case_when(vaccine == 0 ~ sum(sum_all_inc, na.rm = TRUE))) %>%
     filter(row_number() == 1) %>%
     select(-cluster, -time_seq, -sum_SI, -sum_VI, -sum_all_inc) %>%
     ungroup() %>%
@@ -682,10 +682,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   for_poisson <- sir_output %>%
     group_by(run, cluster) %>%
-    mutate(sum_sus = sum(susceptible)) %>%
-    mutate(sum_vax = sum(vaccinated)) %>%
-    mutate(sum_SI = sum(inc_sus_inf)) %>%
-    mutate(sum_VI = sum(inc_vax_inf)) %>%
+    mutate(sum_sus = sum(susceptible, na.rm = TRUE)) %>%
+    mutate(sum_vax = sum(vaccinated, na.rm = TRUE)) %>%
+    mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
+    mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
     filter(row_number() == 1) %>%
     select(-time_seq, -susceptible, -vaccinated,
@@ -707,10 +707,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Sum all numbers in a run
     group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus)) %>%
-    mutate(sum_vax = sum(sum_vax)) %>%
-    mutate(sum_SI = sum(sum_SI)) %>%
-    mutate(sum_VI = sum(sum_VI)) %>%
+    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
+    mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
+    mutate(sum_SI = sum(sum_SI, na.rm = TRUE)) %>%
+    mutate(sum_VI = sum(sum_VI, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     ungroup() %>%
     
@@ -770,8 +770,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Sum all numbers
     group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus)) %>%
-    mutate(sum_SI = sum(sum_SI)) %>%
+    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
+    mutate(sum_SI = sum(sum_SI, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     ungroup()
   
@@ -818,10 +818,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Sum all numbers
     group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus)) %>%
-    mutate(sum_vax = sum(sum_vax)) %>%
-    mutate(sum_VI = sum(sum_VI)) %>%
-    mutate(sum_all_inc = sum(sum_all_inc)) %>%
+    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
+    mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
+    mutate(sum_VI = sum(sum_VI, na.rm = TRUE)) %>%
+    mutate(sum_all_inc = sum(sum_all_inc, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     ungroup() %>%
     
@@ -879,9 +879,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     # Sum all numbers
     group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus)) %>%
-    mutate(sum_vax = sum(sum_vax)) %>%
-    mutate(sum_all_inc = sum(sum_all_inc)) %>%
+    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
+    mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
+    mutate(sum_all_inc = sum(sum_all_inc, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     ungroup() %>%
     
