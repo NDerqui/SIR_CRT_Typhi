@@ -674,8 +674,10 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     
   for_poisson <- sir_output %>%
     group_by(run, cluster) %>%
-    mutate(sum_sus = sum(susceptible, na.rm = TRUE)) %>%
-    mutate(sum_vax = sum(vaccinated, na.rm = TRUE)) %>%
+    mutate(sus_risk = susceptible*time_step) %>%
+    mutate(vax_risk = vaccinated*time_step) %>%
+    mutate(sus_risk = sum(sus_risk, na.rm = TRUE)/365) %>%
+    mutate(vax_risk = sum(vax_risk, na.rm = TRUE)/365) %>%
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
     mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
@@ -695,27 +697,18 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
-    select(run, vaccine, sum_sus, sum_vax, sum_SI, sum_VI) %>%
-    
-    # Sum all numbers in a run
-    group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
-    mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
-    mutate(sum_SI = sum(sum_SI, na.rm = TRUE)) %>%
-    mutate(sum_VI = sum(sum_VI, na.rm = TRUE)) %>%
-    filter(row_number() == 1) %>%
-    ungroup() %>%
+    select(run, vaccine, sus_risk, vax_risk, sum_SI, sum_VI) %>%
     
     # Pivot to get the incidence SI vs VI only
-    pivot_longer(-c(run, vaccine, sum_sus, sum_vax),
+    pivot_longer(-c(run, vaccine, sus_risk, vax_risk),
                  names_to = "vax_incluster", values_to = "incidence") %>%
     # Change names
     mutate(vax_incluster = case_when(vax_incluster == "sum_VI" ~ 1,
                                      vax_incluster == "sum_SI" ~ 0)) %>%
     
     # Get the total
-    mutate(total = case_when(vax_incluster == 1 ~ sum_vax,
-                             vax_incluster == 0 ~ sum_sus)) %>%
+    mutate(total = case_when(vax_incluster == 1 ~ vax_risk,
+                             vax_incluster == 0 ~ sus_risk)) %>%
     # Clean
     select(run, vax_incluster, incidence, total)
   
@@ -758,14 +751,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   sir_indirect <- for_poisson %>%
       
     # Focus therefore only on incidence S to I
-    select(run, vaccine, sum_SI, sum_sus) %>%
-    
-    # Sum all numbers
-    group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
-    mutate(sum_SI = sum(sum_SI, na.rm = TRUE)) %>%
-    filter(row_number() == 1) %>%
-    ungroup()
+    select(run, vaccine, sum_SI, sus_risk)
     
   # Output vector to store the results of the test
     
@@ -773,7 +759,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     
   for (i in 1:n_runs) {
       
-  model <- glm(formula = as.formula((sum_SI/sum_sus) ~ vaccine),
+  model <- glm(formula = as.formula((sum_SI/sus_risk) ~ vaccine),
                family = "poisson"(link = "log"),
                data = filter(sir_indirect, run == i))
       
@@ -806,24 +792,15 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   sir_total <- for_poisson %>%
     
     # Select
-    select(run, vaccine, sum_sus, sum_vax, sum_VI, sum_all_inc) %>%
+    select(run, vaccine, sus_risk, vax_risk, sum_VI, sum_all_inc) %>%
     
-    # Sum all numbers
-    group_by(run, vaccine) %>%
-    mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
-    mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
-    mutate(sum_VI = sum(sum_VI, na.rm = TRUE)) %>%
-    mutate(sum_all_inc = sum(sum_all_inc, na.rm = TRUE)) %>%
-    filter(row_number() == 1) %>%
-    ungroup() %>%
-      
     # Get one var with VI only from vaccine clusters,
     # and all incidence from non-vaccine
     mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
                                  vaccine == 0 ~ sum_all_inc)) %>%
     # Get total
-    mutate(total = case_when(vaccine == 1 ~ sum_vax,
-                             vaccine == 0 ~ sum_sus)) %>%
+    mutate(total = case_when(vaccine == 1 ~ vax_risk,
+                             vaccine == 0 ~ sus_risk)) %>%
     
     # Clean
     select(run, vaccine, incidence, total)
@@ -866,19 +843,11 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     
  sir_overall <- for_poisson %>%
       
-    # We are interested in overall incidence
-    select(run, vaccine, sum_sus, sum_vax, sum_all_inc) %>%
-   
-   # Sum all numbers
-   group_by(run, vaccine) %>%
-   mutate(sum_sus = sum(sum_sus, na.rm = TRUE)) %>%
-   mutate(sum_vax = sum(sum_vax, na.rm = TRUE)) %>%
-   mutate(sum_all_inc = sum(sum_all_inc, na.rm = TRUE)) %>%
-   filter(row_number() == 1) %>%
-   ungroup() %>%
+   # We are interested in overall incidence
+   select(run, vaccine, sus_risk, vax_risk, sum_all_inc) %>%
    
    # Get total
-   mutate(total = sum_sus + sum_vax) %>%
+   mutate(total = sus_risk + vax_risk) %>%
    
    # Clean
    select(run, vaccine, sum_all_inc, total)
@@ -926,13 +895,41 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
   poisson_summary[3, 1:3] <- MeanCI(output_total[,1])
   poisson_summary[4, 1:3] <- MeanCI(output_overall[,1])
   
-  poisson_summary[1, 4] <- MeanCI(output_direct[,4])[1]
-  poisson_summary[2, 4] <- MeanCI(output_indirect[,4])[1]
-  poisson_summary[3, 4] <- MeanCI(output_total[,4])[1]
-  poisson_summary[4, 4] <- MeanCI(output_overall[,4])[1]
+  counts_dir <- n_runs
+  for (i in 1:n_runs) {
+    if(output_direct[i,5] >= 1 | output_direct[i,6] >= 1) {
+      counts_dir <- counts_dir - 1
+    }
+  }
+  
+  counts_ind <- n_runs
+  for (i in 1:n_runs) {
+    if(output_indirect[i,5] >= 1 | output_indirect[i,6] >= 1) {
+      counts_ind <- counts_ind - 1
+    }
+  }
+  
+  counts_tot <- n_runs
+  for (i in 1:n_runs) {
+    if(output_total[i,5] >= 1 | output_total[i,6] >= 1) {
+      counts_tot <- counts_tot - 1
+    }
+  }
+  
+  counts_ove <- n_runs
+  for (i in 1:n_runs) {
+    if(output_overall[i,5] >= 1 | output_overall[i,6] >= 1) {
+      counts_ove <- counts_ove - 1
+    }
+  }
+  
+  poisson_summary[1, 4] <- counts_dir/n_runs*100
+  poisson_summary[2, 4] <- counts_ind/n_runs*100
+  poisson_summary[3, 4] <- counts_tot/n_runs*100
+  poisson_summary[4, 4] <- counts_ove/n_runs*100
   
   rownames(poisson_summary) <- c("Direct", "Indirect", "Total", "Overall")
-  colnames(poisson_summary) <- c("Mean Effect", "Lower CI", "Upper CI", "P-value")
+  colnames(poisson_summary) <- c("Mean Effect", "Lower CI from Mean", "Upper CI from Mean", "Power %")
   
   poisson_summary <- round(poisson_summary, digits = 4)
   
