@@ -216,31 +216,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   colnames(cluster_data) <- c("cluster", "vaccine", "pop",
                               paste0("dis_", cluster_no))
   
-  # Cluster map
-  
-  cluster_pop_map <- ggplot(data = data.frame(number = cluster_no, pop = cluster_n, vax = cluster_vstatus)) +
-    geom_point(aes(x = pop, y = vax, color = as.factor(vax)), size = rel(20)) +
-    geom_label(aes(x = pop, y = vax, label = pop, color = as.factor(vax)), size = rel(5)) +
-    xlim(c(0.6*mean(cluster_n), 1.4*mean(cluster_n))) +
-    ylim(c(-10, 10)) +
-    theme_void() +
-    labs(x = "Cluster population",
-         y = NULL) +
-    scale_color_manual(name = "Cluster vaccination status",
-                       labels=c("Non-vaccinated", "Vaccinated"),
-                       values = c("firebrick", "limegreen")) +
-    theme(
-      axis.title.x = element_text(size = rel(1.1), face="bold"),
-      axis.title.y = element_text(size = rel(1.1), face="bold"),
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
-      legend.position = "bottom",
-      legend.title = element_text(size = rel(1), face="bold"),
-      legend.text = element_text(size=rel(1)),
-      strip.text.x = element_text(size = rel(2))) +
-    facet_wrap(~ fct_relevel(as.character(number), as.character(cluster_map)),
-                 ncol = nrow(cluster_map)) 
-
   
   
   ## Considerations
@@ -971,7 +946,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                other_characteristics = other_characteristics,
                cluster_data = cluster_data,
                cluster_pop = cluster_n,
-               cluster_pop_map = cluster_pop_map,
                equilibrium = plot_eq,
                sir_vax_plot = sir_vax_plot,
                output_direct = output_direct,
@@ -979,7 +953,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                output_overall = output_overall,
                output_total = output_total,
                poisson_summary = poisson_summary,
-               summary_infections = summary
+               summary_infections = summary,
+               icc_de = icc
   )
 
   list
@@ -1038,30 +1013,27 @@ hist(run[[4]], main = "Histogram of clusters' population",
      xlab = "Clusters' population", ylab = "Frequency of clusters")
 dev.off()
 
-png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Map.png"),
-    width = 9, height = 8, units = 'in', res = 600)
-run[[5]]
-dev.off()
-
 png(paste0("Results/", Sys.Date(), "/", name,"/Equilibrium.png"),
     width = 20, height = 12, units = 'in', res = 600)
-run[[6]]
+run[[5]]
 dev.off()
 
 png(paste0("Results/", Sys.Date(), "/", name,"/SIR_after_vax.png"),
     width = 14, height = 9, units = 'in', res = 600)
-run[[7]]
+run[[6]]
 dev.off()
 
-write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[7]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Effect_Direct.xlsx"))
-write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Effect_Indirect.xlsx"))
-write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Effect_Overall.xlsx"))
-write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Effect_Total.xlsx"))
-write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Summary_Effects.xlsx"))
-write.xlsx(as.data.frame(run[[13]]), rowNames = TRUE,
+write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
+write.xlsx(as.data.frame(run[[13]]), rowNames = TRUE,
+           paste0("Results/", Sys.Date(), "/", name,"/ICC_DesignEffect.xlsx"))
