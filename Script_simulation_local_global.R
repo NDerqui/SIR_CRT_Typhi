@@ -685,7 +685,28 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     filter(row_number() == 1) %>%
     select(-time_seq, -susceptible, -vaccinated,
            -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
-    ungroup() 
+    ungroup()
+  
+  icc <- sir_output %>%
+    mutate(sum_all_inc = inc_sus_inf + inc_vax_inf) %>%
+    select(run, cluster, sum_all_inc) %>%
+    group_by(run, cluster) %>%
+    mutate(mean_clus = mean(sum_all_inc)) %>%
+    mutate(group_mean_centered = sum_all_inc - mean_clus) %>%
+    ungroup() %>%
+    group_by(run) %>%
+    mutate(within_var = var(group_mean_centered)) %>%
+    ungroup() %>%
+    group_by(run, cluster) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
+    group_by(run) %>%
+    mutate(between_var = var(mean_clus)) %>%
+    filter(row_number() == 1) %>%
+    select(run, within_var, between_var) %>%
+    mutate(icc = between_var/(between_var + within_var)) %>%
+    mutate(des_eff = 1 + (mean(cluster_n) + 1)*icc) %>%
+    ungroup()
   
   
   
