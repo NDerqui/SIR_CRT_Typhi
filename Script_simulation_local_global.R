@@ -93,22 +93,13 @@ random_cluster <- 1
 # FUNCTION -------------------------------------------------------------
 
 
-simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
+main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
                    incidence, birth, death,       # Incidence, birth and death rate
                    R0, dur_inf, per_local,        # Infection parameters & % of local trans
                    p_vax, p_clusvax, vax_eff,     # Vaccination parameters
                    p_sym, p_test, p_positive,     # Observed infections
                    time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
                    n_runs) {   
-  
-  
-  ## Considerations
-
-  # Calculated parameters
-  
-  beta <- R0/dur_inf                  # Transmission rate
-  mu <- p_sym*p_test*p_positive       # Prob of detecting I
-  
   
   
   ## Cluster data
@@ -214,7 +205,7 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
       
     }
   }
-  diag(cluster_dis) <- 0
+  diag(cluster_dis) <- 1
   
   # Cluster data for reference
   
@@ -250,6 +241,16 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
     facet_wrap(~ fct_relevel(as.character(number), as.character(cluster_map)),
                  ncol = nrow(cluster_map)) 
 
+  
+  
+  ## Considerations
+  
+  # Calculated parameters
+  
+  R0 <- rnorm(n = C, mean = R0, sd = 0.2) # Varying R0
+  beta <- R0/dur_inf                      # Transmission rate
+  mu <- p_sym*p_test*p_positive           # Prob of detecting I
+  
   
   
   ## Step 1: reach equilibrium
@@ -295,8 +296,8 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
       
       # From S to I
       
-      sir_first[i, 8, j] = per_local*beta*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +                                       # FOI: sum of local transmission
-                           (1 - per_local)*beta*sum(sir_first[i-1, 6,], na.rm = TRUE)/sum(sir_first[i-1, 4,], na.rm = TRUE) # and global transmission  
+      sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +                                                  # FOI: sum of local transmission
+                           (1 - per_local)*weighted.mean(x = beta, w = 1/cluster_dis[j,])*sum(sir_first[i-1, 6,])/sum(sir_first[i-1, 4,]) # and global transmission  
       sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
       sir_first[i, 10, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]), digits = 0)
       
@@ -425,8 +426,8 @@ simple <- function(N, C, sd, random_cluster = 1,  # Population and cluster chara
         
         # From S to I
         
-        sir[i, 9, j] = per_local*beta*sir[i-1, 7, j]/sir[i-1, 4 ,j] +                                        # FOI: sum of local transmission
-                       (1 - per_local)*beta*sum(sir[i-1, 7,], na.rm = TRUE)/sum(sir[i-1, 4 ,], na.rm = TRUE) # plus global transmission
+        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +                                                  # FOI: sum of local transmission
+                       (1 - per_local)*weighted.mean(x = beta, w = 1/cluster_dis[j,])*sum(sir[i-1, 7,])/sum(sir[i-1, 4,]) # and global transmission  
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
         sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
         
@@ -982,7 +983,7 @@ p_clusvax
 
 # Run
 
-run <- simple(N = N, C = C, sd = sd,
+run <- main(N = N, C = C, sd = sd,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
               p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
