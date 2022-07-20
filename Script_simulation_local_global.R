@@ -271,8 +271,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       
       # From S to I
       
-      sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +                                                  # FOI: sum of local transmission
-                           (1 - per_local)*weighted.mean(x = beta, w = 1/cluster_dis[j,])*sum(sir_first[i-1, 6,])/sum(sir_first[i-1, 4,]) # and global transmission  
+      sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j]                               # FOI: sum of local transmission
+      for (k in 1:C) {
+        sir_first[i, 8, j] = sir_first[i, 8, j] + (1 - per_local)*beta[k]*sir_first[i-1, 6, k]/sir_first[i-1, 4, k]  # and global transmission  
+      }
       sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
       sir_first[i, 10, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]), digits = 0)
       
@@ -401,8 +403,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         
         # From S to I
         
-        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +                                                  # FOI: sum of local transmission
-                       (1 - per_local)*weighted.mean(x = beta, w = 1/cluster_dis[j,])*sum(sir[i-1, 7,])/sum(sir[i-1, 4,]) # and global transmission  
+        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j]                         # FOI: sum of local transmission
+        for (k in 1:C) {
+          sir[i, 9, j] = sir[i, 9, j] + (1 - per_local)*beta[k]*sir[i-1, 7, k]/sir[i-1, 4, k]  # and global transmission  
+        }
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
         sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
         
