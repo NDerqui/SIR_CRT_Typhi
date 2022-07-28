@@ -228,129 +228,101 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   
   
-  ## Step 1: reach equilibrium
-  
-  # Total time
-  
-  time_seq1 <- seq(from = 1, to = 365*years1, by = time_step)
-  
-  # Build the array
-  
-  names_row1 <- paste0("t_", time_seq1)
-  
-  names_column1 <- c("cluster", "vax_status", "time_seq", 
-                     "no_N", "no_S", "no_I", "no_R",
-                     "haz_inf","prob_infec", "inc_SI",
-                     "prob_recov", "inc_IR",
-                     "prob_death", "inc_SD", "inc_ID", "inc_RD",
-                     "prob_birth", "inc_NB")
-  
-  names_matrix1 <- paste0("cluster_", cluster_no)
-  
-  sir_first <- array(0, dim = c(length(time_seq1), 18, C),
-                     dimnames = list(names_row1, names_column1, names_matrix1))
-  
-  # Assign initial values
-  
-  sir_first[, 3, ] <- time_seq1
-  
-  for (i in 1:C) {
-    sir_first[, 1, i] = cluster_no[i]
-    sir_first[, 2, i] = cluster_vstatus[i]
-    sir_first[, 4, i] = cluster_n[i]
-    sir_first[, 6, i] = round(incidence*sir_first[, 4, i], digits = 0)           # Initial I depends on incidence rate
-    sir_first[, 5, i] = round((sir_first[, 4 ,i]-sir_first[, 6, i]), digits = 0) # Initial S depends on N - I
-    sir_first[, 7, i] = 0
-  }
-  
-  # Put the model to run
-  
-  for (i in 2:length(time_seq1)) {
-    
-    for (j in sample(1:C)) {
-      
-      # From S to I
-      
-      sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j]                               # FOI: sum of local transmission
-      for (k in 1:C) {
-        sir_first[i, 8, j] = sir_first[i, 8, j] + (1 - per_local)*beta[k]*sir_first[i-1, 6, k]/sir_first[i-1, 4, k]  # and global transmission  
-      }
-      sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
-      sir_first[i, 10, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]), digits = 0)
-      
-      # From I to R
-      
-      sir_first[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
-      sir_first[i, 12, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j]), digits = 0) 
-      
-      # Deaths
-      
-      sir_first[i, 13, j] = (1 - exp(-death*time_step))  
-      sir_first[i, 14, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j]), digits = 0) 
-      sir_first[i, 15, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j]), digits = 0) 
-      sir_first[i, 16, j] = round(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j]), digits = 0) 
-      
-      # Births
-      
-      sir_first[i, 17, j] = (1 - exp(-birth*time_step))  
-      sir_first[i, 18, j] = round(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j]), digits = 0) 
-      
-      # Model equations
-      sir_first[i, 5, j] = sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]
-      sir_first[i, 6, j] = sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j]
-      sir_first[i, 7, j] = sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j]
-      sir_first[i, 4, j] = sir_first[i, 5, j] + sir_first[i, 6, j] + sir_first[i, 7, j]
-      
-    }
-  }
-  
-  # Graph to check
-  
-  sir_first_result_graph <- as.data.frame(matrix(0, nrow = length(time_seq1), ncol = C))
-  colnames(sir_first_result_graph) <- names_matrix1
-  for (i in 1:C) {
-    sir_first_result_graph[,i] <- sir_first[,6,i]
-  }
-  
-  sir_first_result_graph <- sir_first_result_graph %>%
-    mutate(time_seq = time_seq1) %>%
-    pivot_longer(-time_seq, names_to = "cluster", values_to = "infected") %>%
-    mutate(num_cluster = readr::parse_number(cluster)) %>%
-    arrange(num_cluster)
-  
-  plot_eq <- ggplot(data = sir_first_result_graph) +
-    geom_line(mapping = aes(x = time_seq, y = infected, group = num_cluster),
-              color = "firebrick") +
-    theme_classic() +
-    labs(title = "Incidence over time",
-         x = paste0("Time over ", years1, " years (days)"),
-         y = "Number of infections") +
-    theme(
-      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
-      axis.title.x = element_text(size = rel(1.1), face="bold"),
-      axis.title.y = element_text(size = rel(1.1), face="bold"),
-      axis.text = element_text(size=rel(1)))
-  
-  #  Store the results: input the last row for the vaccine simulation
-  
-  equilibrium_result <- as.data.frame(matrix(0, nrow = C, ncol = 18))
-  colnames(equilibrium_result) <- names_column1
-  for (i in 1:C) {
-    equilibrium_result[i, ] <- sir_first[length(time_seq1), , i]         
-  }
-  
-  
-  
-  ## Step 2: vaccine introduction
+  ## For several simulations  
   
   sir_output <- data.frame(cluster = 0, vaccine = 0, time_seq = 0,
                            susceptible = 0, vaccinated = 0, infected = 0, observed = 0,
                            inc_sus_inf = 0, inc_vax_inf = 0, run = 0)
   
   
-  ## For several simulations
-  
   for (n in 1:n_runs) {
+    
+    
+    ## Step 1: reach equilibrium
+    
+    # Total time
+    
+    time_seq1 <- seq(from = 1, to = 365*years1, by = time_step)
+    
+    # Build the array
+    
+    names_row1 <- paste0("t_", time_seq1)
+    
+    names_column1 <- c("cluster", "vax_status", "time_seq", 
+                       "no_N", "no_S", "no_I", "no_R",
+                       "haz_inf","prob_infec", "inc_SI",
+                       "prob_recov", "inc_IR",
+                       "prob_death", "inc_SD", "inc_ID", "inc_RD",
+                       "prob_birth", "inc_NB")
+    
+    names_matrix1 <- paste0("cluster_", cluster_no)
+    
+    sir_first <- array(0, dim = c(length(time_seq1), 18, C),
+                       dimnames = list(names_row1, names_column1, names_matrix1))
+    
+    # Assign initial values
+    
+    sir_first[, 3, ] <- time_seq1
+    
+    for (i in 1:C) {
+      sir_first[, 1, i] = cluster_no[i]
+      sir_first[, 2, i] = cluster_vstatus[i]
+      sir_first[, 4, i] = cluster_n[i]
+      sir_first[, 6, i] = round(incidence*sir_first[, 4, i], digits = 0)           # Initial I depends on incidence rate
+      sir_first[, 5, i] = round((sir_first[, 4 ,i]-sir_first[, 6, i]), digits = 0) # Initial S depends on N - I
+      sir_first[, 7, i] = 0
+    }
+    
+    # Put the model to run
+    
+    for (i in 2:length(time_seq1)) {
+      
+      for (j in sample(1:C)) {
+        
+        # From S to I
+        
+        sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +
+          (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir_first[i-1, 6,], na.rm = TRUE)/sum(sir_first[i-1, 4,], na.rm = TRUE)
+        sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
+        sir_first[i, 10, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]), digits = 0)
+        
+        # From I to R
+        
+        sir_first[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
+        sir_first[i, 12, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j]), digits = 0) 
+        
+        # Deaths
+        
+        sir_first[i, 13, j] = (1 - exp(-death*time_step))  
+        sir_first[i, 14, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j]), digits = 0) 
+        sir_first[i, 15, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j]), digits = 0) 
+        sir_first[i, 16, j] = round(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j]), digits = 0) 
+        
+        # Births
+        
+        sir_first[i, 17, j] = (1 - exp(-birth*time_step))  
+        sir_first[i, 18, j] = round(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j]), digits = 0) 
+        
+        # Model equations
+        sir_first[i, 5, j] = sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]
+        sir_first[i, 6, j] = sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j]
+        sir_first[i, 7, j] = sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j]
+        sir_first[i, 4, j] = sir_first[i, 5, j] + sir_first[i, 6, j] + sir_first[i, 7, j]
+        
+      }
+    }
+    
+    #  Store the results: input the last row for the vaccine simulation
+    
+    equilibrium_result <- as.data.frame(matrix(0, nrow = C, ncol = 18))
+    colnames(equilibrium_result) <- names_column1
+    for (i in 1:C) {
+      equilibrium_result[i, ] <- sir_first[length(time_seq1), , i]         
+    }
+    
+    
+    ## Step 2: vaccine introduction
+    
     
     # Total time
     
@@ -403,10 +375,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         
         # From S to I
         
-        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j]                         # FOI: sum of local transmission
-        for (k in 1:C) {
-          sir[i, 9, j] = sir[i, 9, j] + (1 - per_local)*beta[k]*sir[i-1, 7, k]/sir[i-1, 4, k]  # and global transmission  
-        }
+        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +
+          (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir[i-1, 7,], na.rm = TRUE)/sum(sir[i-1, 4,], na.rm = TRUE) 
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
         sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
         
@@ -986,12 +956,12 @@ p_clusvax
 
 # Run
 
-run <- main(N = N, C = C, sd = sd,
+run <- main(N = N, C = 100, sd = sd,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
               p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
               p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-              years1 = 5, years2 = 2, n_runs = 10)
+              years1 = 1, years2 = 1, n_runs = 10)
 
 
 #### Save results #### 
