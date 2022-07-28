@@ -919,7 +919,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   list <- list(name_simulation = name_simulation,
                other_characteristics = other_characteristics,
                cluster_pop = cluster_n,
-               equilibrium = plot_eq,
                sir_vax_plot = sir_vax_plot,
                output_direct = output_direct,
                output_indirect = output_indirect,
@@ -956,7 +955,7 @@ p_clusvax
 
 # Run
 
-run <- main(N = N, C = 100, sd = sd,
+run <- main(N = 10000, C = 50, sd = sd,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
               p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
