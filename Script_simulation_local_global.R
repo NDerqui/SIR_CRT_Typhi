@@ -450,18 +450,18 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0)
     }
     
-    ## Incidence of infection from S
+    ## Detected incidence of infection from S
     sir_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_SI) <- names_matrix2
     for (i in 1:C) {
-      sir_res_inc_SI[,i] <- sir[,11,i]
+      sir_res_inc_SI[,i] <- round(sir[,11,i]*mu, digits = 0)
     }
     
-    ## Incidence of infection from V
+    ## Detected incidence of infection from V
     sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_VI) <- names_matrix2
     for (i in 1:C) {
-      sir_res_inc_VI[,i] <- sir[,13,i]
+      sir_res_inc_VI[,i] <- round(sir[,13,i]*mu, digits = 0)
     }
     
     ## Pivot the results and merge all together
@@ -594,6 +594,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Summarize the results
   
+  ## Total infections
   summary <- sir_output %>%
     group_by(run, cluster) %>%
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
@@ -621,7 +622,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     select(-run) %>%
     ungroup()
   rownames(summary) <- c("Mean_Runs_Vax", "Mean_Runs_NoVax")
-    
+  
+  ## Data for the Poisson regression  
   for_poisson <- sir_output %>%
     group_by(run, cluster) %>%
     mutate(sus_risk = susceptible*time_step) %>%
@@ -636,6 +638,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
            -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
   
+  ## Calculating ICC and DesignEffect
   icc <- sir_output %>%
     mutate(sum_all_inc = inc_sus_inf + inc_vax_inf) %>%
     select(run, cluster, sum_all_inc) %>%
@@ -906,6 +909,19 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   
   
+  ## Other summary
+  
+  other_summary <- matrix(0, nrow = 3, ncol = 4)
+  
+  other_summary[1, 1:3] <- MeanCI(icc[,1])
+  other_summary[2, 1:3] <- MeanCI(icc[,4])
+  other_summary[3, 1:3] <- MeanCI(R0)
+  
+  rownames(other_summary) <- c("ICC", "DEsign Effect", "R0")
+  colnames(other_summary) <- c("Mean Effect", "Lower CI from Mean", "Upper CI from Mean", "Power %")
+  
+  
+  
   ## Returned objects
   
   name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " PerLocal=", per_local,
@@ -920,13 +936,14 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                other_characteristics = other_characteristics,
                cluster_pop = cluster_n,
                sir_vax_plot = sir_vax_plot,
+               summary_infections = summary,
                output_direct = output_direct,
                output_indirect = output_indirect,
                output_overall = output_overall,
                output_total = output_total,
                poisson_summary = poisson_summary,
-               summary_infections = summary,
                icc_design = icc,
+               other_summary = other_summary,
                reference_data = list(cluster_map = cluster_map,
                                      cluster_data = cluster_data,
                                      equilibrium_result = equilibrium_result,
