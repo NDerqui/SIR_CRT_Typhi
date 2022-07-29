@@ -580,7 +580,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                                   "Detected infections in non-vaccine cluster")) +
     theme_classic() +
     labs(title = paste0("Incidence over time in n = ", C, " clusters"),
-         x = paste0("Time over n = ", years2, "years (days)"),
+         x = paste0("Time over n = ", years2, " years (days)"),
          y = "Number of infections/detected infections") +
     theme(
       plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
