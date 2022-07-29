@@ -580,7 +580,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                                   "Detected infections in non-vaccine cluster")) +
     theme_classic() +
     labs(title = paste0("Incidence over time in n = ", C, " clusters"),
-         x = "Time (days)",
+         x = paste0("Time over n = ", years2, "years (days)"),
          y = "Number of infections/detected infections") +
     theme(
       plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
@@ -658,7 +658,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     select(run, within_var, between_var) %>%
     mutate(icc = between_var/(between_var + within_var)) %>%
     mutate(des_eff = 1 + (mean(cluster_n) + 1)*icc) %>%
-    ungroup()
+    ungroup() %>%
+    as.data.frame()
   
   
   
@@ -913,8 +914,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   other_summary <- matrix(0, nrow = 3, ncol = 4)
   
-  other_summary[1, 1:3] <- MeanCI(icc[,1])
-  other_summary[2, 1:3] <- MeanCI(icc[,4])
+  other_summary[1, 1:3] <- MeanCI(icc[,1], na.rm = TRUE)
+  other_summary[2, 1:3] <- MeanCI(icc[,4], na.rm = TRUE)
   other_summary[3, 1:3] <- MeanCI(R0)
   
   rownames(other_summary) <- c("ICC", "DEsign Effect", "R0")
@@ -924,7 +925,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0("N=", N, " C=", C, " sd=", sd, " PerLocal=", per_local,
+  name_simulation <- paste0(" C=", C, " sd=", sd, " PerLocal=", per_local, "N=", N,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -972,12 +973,12 @@ p_clusvax
 
 # Run
 
-run <- main(N = 10000, C = 50, sd = sd,
+run <- main(N = 10000, C = 10, sd = 100,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
-              p_vax = p_vax, p_clusvax = p_clusvax, vax_eff = vax_eff,
+              p_vax = 0.5, p_clusvax = p_clusvax, vax_eff = 0.7,
               p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-              years1 = 1, years2 = 1, n_runs = 10)
+              years1 = 3, years2 = 2, n_runs = 100)
 
 
 #### Save results #### 
