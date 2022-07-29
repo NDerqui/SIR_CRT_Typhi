@@ -914,8 +914,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   other_summary <- matrix(0, nrow = 3, ncol = 4)
   
-  other_summary[1, 1:3] <- MeanCI(icc[,1], na.rm = TRUE)
-  other_summary[2, 1:3] <- MeanCI(icc[,4], na.rm = TRUE)
+  other_summary[1, 1:3] <- MeanCI(icc[,4], na.rm = TRUE)
+  other_summary[2, 1:3] <- MeanCI(icc[,5], na.rm = TRUE)
   other_summary[3, 1:3] <- MeanCI(R0)
   
   rownames(other_summary) <- c("ICC", "DEsign Effect", "R0")
