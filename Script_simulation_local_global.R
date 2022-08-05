@@ -58,7 +58,7 @@ dur_inf <- 7       # Duration of infectiousness (days)
 
 # Percentage of local transmission, the rest of global transmission
 
-per_local <- 0.5
+per_local <- 0.95
 
 
 #### Vaccination ####
@@ -925,7 +925,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0(" C=", C, " sd=", sd, " PerLocal=", per_local, "N=", N,
+  name_simulation <- paste0(" C=", C, " sd=", sd, " PerLocal=", per_local, " N=", N,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -973,10 +973,10 @@ p_clusvax
 
 # Run
 
-run <- main(N = 10000, C = 10, sd = 100,
+run <- main(N = 200000, C = 20, sd = 500,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
-              p_vax = 0.5, p_clusvax = p_clusvax, vax_eff = 0.7,
+              p_vax = 0.9, p_clusvax = p_clusvax, vax_eff = 0.7,
               p_sym = p_sym, p_test = p_test, p_positive = p_positive,
               years1 = 3, years2 = 2, n_runs = 100)
 
