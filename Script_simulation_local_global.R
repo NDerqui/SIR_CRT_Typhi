@@ -640,10 +640,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Calculating ICC and DesignEffect
   icc <- sir_output %>%
-    mutate(sum_all_inc = inc_sus_inf + inc_vax_inf) %>%
+    mutate(sum_all_inc = inc_sus_inf + inc_vax_inf, na.rm = TRUE) %>%
     select(run, cluster, sum_all_inc) %>%
     group_by(run, cluster) %>%
-    mutate(mean_clus = mean(sum_all_inc)) %>%
+    mutate(mean_clus = mean(sum_all_inc, na.rm = TRUE)) %>%
     mutate(group_mean_centered = sum_all_inc - mean_clus) %>%
     ungroup() %>%
     group_by(run) %>%
@@ -657,7 +657,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     filter(row_number() == 1) %>%
     select(run, within_var, between_var) %>%
     mutate(icc = between_var/(between_var + within_var)) %>%
-    mutate(des_eff = 1 + (mean(cluster_n) + 1)*icc) %>%
+    mutate(des_eff = 1 + (mean(cluster_n) - 1)*icc) %>%
     ungroup() %>%
     as.data.frame()
   
@@ -973,12 +973,12 @@ p_clusvax
 
 # Run
 
-run <- main(N = 200000, C = 20, sd = 500,
+run <- main(N = 10000, C = 40, sd = 500,
               incidence = incidence, birth = birth, death = death,
               R0 = R0, dur_inf = dur_inf, per_local = per_local,
               p_vax = 0.9, p_clusvax = p_clusvax, vax_eff = 0.7,
               p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-              years1 = 3, years2 = 2, n_runs = 100)
+              years1 = 3, years2 = 2, n_runs = 10)
 
 
 #### Save results #### 
