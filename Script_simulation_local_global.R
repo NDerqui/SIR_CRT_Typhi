@@ -880,28 +880,28 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   counts_dir <- n_runs
   for (i in 1:n_runs) {
-    if(output_direct[i,5] >= 1 | output_direct[i,6] >= 1) {
+    if(output_direct[i,5] < 1 & output_direct[i,6] >= 1) {
       counts_dir <- counts_dir - 1
     }
   }
   
   counts_ind <- n_runs
   for (i in 1:n_runs) {
-    if(output_indirect[i,5] >= 1 | output_indirect[i,6] >= 1) {
+    if(output_indirect[i,5] < 1 & output_indirect[i,6] >= 1) {
       counts_ind <- counts_ind - 1
     }
   }
   
   counts_tot <- n_runs
   for (i in 1:n_runs) {
-    if(output_total[i,5] >= 1 | output_total[i,6] >= 1) {
+    if(output_total[i,5] < 1 & output_total[i,6] >= 1) {
       counts_tot <- counts_tot - 1
     }
   }
   
   counts_ove <- n_runs
   for (i in 1:n_runs) {
-    if(output_overall[i,5] >= 1 | output_overall[i,6] >= 1) {
+    if(output_overall[i,5] < 1 & output_overall[i,6] >= 1) {
       counts_ove <- counts_ove - 1
     }
   }
