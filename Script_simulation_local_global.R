@@ -865,10 +865,18 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   poisson_summary <- matrix(0, nrow = 4, ncol = 4)
   
-  poisson_summary[1, 1:3] <- MeanCI(output_direct[,1])
-  poisson_summary[2, 1:3] <- MeanCI(output_indirect[,1])
-  poisson_summary[3, 1:3] <- MeanCI(output_total[,1])
-  poisson_summary[4, 1:3] <- MeanCI(output_overall[,1])
+  poisson_summary[1, 1] <- mean(output_direct[,1], na.rm = TRUE)
+  poisson_summary[1, 2] <- quantile(output_direct[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  poisson_summary[1, 3] <- quantile(output_direct[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  poisson_summary[2, 1] <- mean(output_indirect[,1], na.rm = TRUE)
+  poisson_summary[2, 2] <- quantile(output_indirect[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  poisson_summary[2, 3] <- quantile(output_indirect[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  poisson_summary[3, 1] <- mean(output_total[,1], na.rm = TRUE)
+  poisson_summary[3, 2] <- quantile(output_total[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  poisson_summary[3, 3] <- quantile(output_total[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  poisson_summary[4, 1] <- mean(output_overall[,1], na.rm = TRUE)
+  poisson_summary[4, 2] <- quantile(output_overall[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  poisson_summary[4, 3] <- quantile(output_overall[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
   
   counts_dir <- n_runs
   for (i in 1:n_runs) {
