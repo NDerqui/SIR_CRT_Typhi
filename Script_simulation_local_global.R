@@ -922,9 +922,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   other_summary <- matrix(0, nrow = 3, ncol = 4)
   
-  other_summary[1, 1:3] <- MeanCI(icc[,4], na.rm = TRUE)
-  other_summary[2, 1:3] <- MeanCI(icc[,5], na.rm = TRUE)
-  other_summary[3, 1:3] <- MeanCI(R0)
+  other_summary[1, 1] <- mean(icc[,4], na.rm = TRUE)
+  other_summary[1, 2] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  other_summary[1, 3] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  other_summary[2, 1] <- mean(icc[,5], na.rm = TRUE)
+  other_summary[2, 2] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  other_summary[2, 3] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  other_summary[3, 1] <- mean(R0, na.rm = TRUE)
+  other_summary[3, 2] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  other_summary[3, 3] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[2]
   
   rownames(other_summary) <- c("ICC", "DEsign Effect", "R0")
   colnames(other_summary) <- c("Mean Effect", "Lower CI from Mean", "Upper CI from Mean", "Power %")
