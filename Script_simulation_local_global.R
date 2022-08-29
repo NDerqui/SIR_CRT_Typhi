@@ -81,7 +81,7 @@ p_positive <- 0.60  # Probability of test being positive
 
 N <- 200000               # Total population in the study
 C <- 100                  # Number of clusters
-sd <- 100                 # Variance in cluster populations
+sd <- 0.01                # Variance in cluster populations: as factor (0.01 // 0.2)
 
 random_cluster <- 1
 
@@ -128,7 +128,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Population in each cluster vector
   
-  n <- as.positive(rnorm(n = C, mean = N/C, sd = sd))
+  n <- as.positive(rnorm(n = C, mean = N/C, sd = sd*N/C))
   cluster_n <- abs(n)
   
   # Cluster (and vaccine allocation) distribution
