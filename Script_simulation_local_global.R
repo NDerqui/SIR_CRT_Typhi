@@ -93,6 +93,24 @@ random_cluster <- 1
 # FUNCTION -------------------------------------------------------------
 
 
+as.positive <- function(x) {
+  
+  for (i in 1:length(x)) {
+    
+    x[i] <- round(x[i], digits = 0)
+    
+    if (x[i] < 0) {
+      x[i] <- 0
+    } else {
+      x[i] <- x[i]
+    }
+  
+  }
+  
+  x
+}
+
+
 main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
                    incidence, birth, death,       # Incidence, birth and death rate
                    R0, dur_inf, per_local,        # Infection parameters & % of local trans
@@ -110,7 +128,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Population in each cluster vector
   
-  n <- round(rnorm(n = C, mean = N/C, sd = sd), digits = 0)
+  n <- as.positive(rnorm(n = C, mean = N/C, sd = sd))
   cluster_n <- abs(n)
   
   # Cluster (and vaccine allocation) distribution
@@ -268,8 +286,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[, 1, i] = cluster_no[i]
       sir_first[, 2, i] = cluster_vstatus[i]
       sir_first[, 4, i] = cluster_n[i]
-      sir_first[, 6, i] = round(incidence*sir_first[, 4, i]*7, digits = 0)           # Initial I depends on incidence rate
-      sir_first[, 5, i] = round((sir_first[, 4 ,i]-sir_first[, 6, i]), digits = 0) # Initial S depends on N - I
+      sir_first[, 6, i] = as.positive(incidence*sir_first[, 4, i]*7)         # Initial I depends on incidence rate
+      sir_first[, 5, i] = as.positive((sir_first[, 4 ,i]-sir_first[, 6, i])) # Initial S depends on N - I
       sir_first[, 7, i] = 0
     }
     
@@ -284,24 +302,24 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +
           (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir_first[i-1, 6,], na.rm = TRUE)/sum(sir_first[i-1, 4,], na.rm = TRUE)
         sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
-        sir_first[i, 10, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]), digits = 0)
+        sir_first[i, 10, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]))
         
         # From I to R
         
         sir_first[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir_first[i, 12, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j]), digits = 0) 
+        sir_first[i, 12, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j])) 
         
         # Deaths
         
         sir_first[i, 13, j] = (1 - exp(-death*time_step))  
-        sir_first[i, 14, j] = round(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j]), digits = 0) 
-        sir_first[i, 15, j] = round(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j]), digits = 0) 
-        sir_first[i, 16, j] = round(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j]), digits = 0) 
+        sir_first[i, 14, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j])) 
+        sir_first[i, 15, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j])) 
+        sir_first[i, 16, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j])) 
         
         # Births
         
         sir_first[i, 17, j] = (1 - exp(-birth*time_step))  
-        sir_first[i, 18, j] = round(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j]), digits = 0) 
+        sir_first[i, 18, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j])) 
         
         # Model equations
         sir_first[i, 5, j] = sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]
