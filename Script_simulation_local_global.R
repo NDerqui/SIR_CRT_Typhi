@@ -268,7 +268,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[, 1, i] = cluster_no[i]
       sir_first[, 2, i] = cluster_vstatus[i]
       sir_first[, 4, i] = cluster_n[i]
-      sir_first[, 6, i] = round(incidence*sir_first[, 4, i], digits = 0)           # Initial I depends on incidence rate
+      sir_first[, 6, i] = round(incidence*sir_first[, 4, i]*7, digits = 0)           # Initial I depends on incidence rate
       sir_first[, 5, i] = round((sir_first[, 4 ,i]-sir_first[, 6, i]), digits = 0) # Initial S depends on N - I
       sir_first[, 7, i] = 0
     }
@@ -647,13 +647,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(group_mean_centered = sum_all_inc - mean_clus) %>%
     ungroup() %>%
     group_by(run) %>%
-    mutate(within_var = var(group_mean_centered)) %>%
+    mutate(within_var = var(group_mean_centered, na.rm = TRUE)) %>%
     ungroup() %>%
     group_by(run, cluster) %>%
     filter(row_number() == 1) %>%
     ungroup() %>%
     group_by(run) %>%
-    mutate(between_var = var(mean_clus)) %>%
+    mutate(between_var = var(mean_clus, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     select(run, within_var, between_var) %>%
     mutate(icc = between_var/(between_var + within_var)) %>%
