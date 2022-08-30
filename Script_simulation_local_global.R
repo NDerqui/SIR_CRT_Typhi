@@ -375,9 +375,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     }
     
     for (i in 1:C) {
-      if (sir[1, 2, i] == 1) {                                                # In vaccinated clusters
-        sir[, 5, i] = round(equilibrium_result[i, 5]*(1 - p_vax), digits = 0) # S=S*(1-COVERAGE)
-        sir[, 6, i] = round(equilibrium_result[i, 5]*p_vax, digits = 0)       # V=S*COVERAGE
+      if (sir[1, 2, i] == 1) {                                          # In vaccinated clusters
+        sir[, 5, i] = as.positive(equilibrium_result[i, 5]*(1 - p_vax)) # S=S*(1-COVERAGE)
+        sir[, 6, i] = as.positive(equilibrium_result[i, 5]*p_vax)       # V=S*COVERAGE
         
       } else {                                   # In non-vax clusters
         sir[, 5, i] = equilibrium_result[i, 5]   # Susceptible are all S from simulation
@@ -396,36 +396,36 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +
           (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir[i-1, 7,], na.rm = TRUE)/sum(sir[i-1, 4,], na.rm = TRUE) 
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
-        sir[i, 11, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]), digits = 0)
+        sir[i, 11, j] = as.positive(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]))
         
         # From V to I
         
         sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
-        sir[i, 13, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]), digits = 0)
+        sir[i, 13, j] = as.positive(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]))
         
         # From I to R
         
         sir[i, 14, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir[i, 15, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j]), digits = 0)  
+        sir[i, 15, j] = as.positive(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j]))  
         
         # Deaths
         
         sir[i, 16, j] = (1 - exp(-death*time_step))  
-        sir[i, 17, j] = round(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j]), digits = 0) 
-        sir[i, 18, j] = round(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j]), digits = 0) 
-        sir[i, 19, j] = round(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j]), digits = 0) 
-        sir[i, 20, j] = round(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j]), digits = 0) 
+        sir[i, 17, j] = as.positive(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j])) 
+        sir[i, 18, j] = as.positive(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j])) 
+        sir[i, 19, j] = as.positive(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j])) 
+        sir[i, 20, j] = as.positive(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j])) 
         
         # Births
         
         sir[i, 21, j] = (1 - exp(-birth*time_step))  
-        sir[i, 22, j] = round(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j]), digits = 0) 
+        sir[i, 22, j] = as.positive(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j])) 
         
         # Model equations
         if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
           
-          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + round(sir[i, 22, j]*(1-p_vax), digits = 0)
-          sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + round(sir[i, 22, j]*(p_vax), digits = 0)
+          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + as.positive(sir[i, 22, j]*(1-p_vax))
+          sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + as.positive(sir[i, 22, j]*(p_vax))
         
         } else {                   # In non-vaccine clusters, all births go to S
           
