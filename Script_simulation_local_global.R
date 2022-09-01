@@ -1005,12 +1005,12 @@ p_clusvax
 
 # Run
 
-run <- main(N = 10000, C = 40, sd = 500,
-              incidence = incidence, birth = birth, death = death,
-              R0 = R0, dur_inf = dur_inf, per_local = per_local,
-              p_vax = 0.9, p_clusvax = p_clusvax, vax_eff = 0.7,
-              p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-              years1 = 3, years2 = 2, n_runs = 10)
+run <- main(N = 200000, C = 10, sd = 0.2,
+            incidence = incidence, birth = birth, death = death,
+            R0 = R0, dur_inf = dur_inf, per_local = 0.5,
+            p_vax = 0.5, p_clusvax = p_clusvax, vax_eff = 0.8,
+            p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+            years1 = 3, years2 = 2, n_runs = 10)
 
 
 #### Save results #### 
@@ -1061,3 +1061,73 @@ write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/Other_sum.xlsx"))
 
 saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_reference.Rds"))
+
+
+#### Do in a loop ####
+
+pop_list <- c(200000, 100000, 50000)
+sd_list <- c(0.01, 0.2)
+cover_list <- c(0.5, 0.7, 0.9)
+
+for (i in 1:length(pop_list)) {
+  
+  for (j in 1:length(sd_list)) {
+    
+    for (k in 1:length(cover_list)) {
+      
+      run <- main(N = pop_list[i], C = 30, sd = sd_list[j],
+                  incidence = incidence, birth = birth, death = death,
+                  R0 = R0, dur_inf = dur_inf, per_local = 0.90,
+                  p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.8,
+                  p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                  years1 = 3, years2 = 2, n_runs = 10)
+      
+      # Directory
+      
+      dir.create(here("Results/", Sys.Date()),recursive = TRUE)
+      
+      # Give name to simulation
+      
+      name <- run[[1]]
+      
+      dir.create(here(paste0("Results/", Sys.Date(), "/", name)),recursive = TRUE)
+      
+      # Save
+      
+      write.table(run[[2]], file = paste0("Results/", Sys.Date(), "/", name,"/characteristics.txt"))
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Pop_Hist.png"),
+          width = 9, height = 5, units = 'in', res = 600)
+      hist(run[[3]], main = "Histogram of clusters' population",
+           xlab = "Clusters' population", ylab = "Frequency of clusters")
+      dev.off()
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Infections_after_vax.png"),
+          width = 14, height = 9, units = 'in', res = 600)
+      run[[4]]
+      dev.off()
+      
+      write.xlsx(as.data.frame(run[[5]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[6]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Direct_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[7]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Indirect_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Overall_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Total_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Summary_RR_Effects.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/IntraCC_DesignEffect.xlsx"))
+      write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Other_sum.xlsx"))
+      
+      saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_reference.Rds"))
+      
+    }
+  }
+}
