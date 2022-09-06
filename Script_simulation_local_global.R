@@ -99,11 +99,7 @@ as.positive <- function(x) {
     
     x[i] <- round(x[i], digits = 0)
     
-    if (x[i] < 0) {
-      x[i] <- 0
-    } else {
-      x[i] <- x[i]
-    }
+    ifelse(x[i] >= 0, x[i] <- x[i], x[i] <- 0)
   
   }
   
@@ -322,9 +318,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir_first[i, 18, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j])) 
         
         # Model equations
-        sir_first[i, 5, j] = sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]
-        sir_first[i, 6, j] = sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j]
-        sir_first[i, 7, j] = sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j]
+        sir_first[i, 5, j] = as.positive(sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j])
+        sir_first[i, 6, j] = as.positive(sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j])
+        sir_first[i, 7, j] = as.positive(sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j])
         sir_first[i, 4, j] = sir_first[i, 5, j] + sir_first[i, 6, j] + sir_first[i, 7, j]
         
       }
@@ -424,15 +420,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         # Model equations
         if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
           
-          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + as.positive(sir[i, 22, j]*(1-p_vax))
-          sir[i, 6, j] = sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + as.positive(sir[i, 22, j]*(p_vax))
+          sir[i, 5, j] = as.positive(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + as.positive(sir[i, 22, j]*(1-p_vax)))
+          sir[i, 6, j] = as.positive(sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + as.positive(sir[i, 22, j]*(p_vax)))
         
         } else {                   # In non-vaccine clusters, all births go to S
           
-          sir[i, 5, j] = sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j]
+          sir[i, 5, j] = as.positive(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j])
         }
-        sir[i, 7, j] = sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]
-        sir[i, 8, j] = sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]
+        sir[i, 7, j] = as.positive(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j])
+        sir[i, 8, j] = as.positive(sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j])
         sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
         
       }
