@@ -639,7 +639,11 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Data for the Poisson regression  
   for_poisson <- sir_output %>%
+    mutate(eliminate = case_when(is.na(infected) ~ 1,
+                                 infected >= 0 ~ 0)) %>%
     group_by(run, cluster) %>%
+    mutate(eliminate = max(eliminate)) %>%
+    filter(eliminate == 0) %>%
     mutate(sus_risk = susceptible*time_step) %>%
     mutate(vax_risk = vaccinated*time_step) %>%
     mutate(sus_risk = sum(sus_risk, na.rm = TRUE)/365) %>%
@@ -1061,7 +1065,7 @@ saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_re
 
 #### Do in a loop ####
 
-pop_list <- c(200000, 100000, 50000)
+pop_list <- c(200000, 100000, 50000, 20000, 10000)
 sd_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
 
@@ -1071,10 +1075,10 @@ for (i in 1:length(pop_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = pop_list[i], C = 30, sd = sd_list[j],
+      run <- main(N = pop_list[i], C = 10, sd = sd_list[j],
                   incidence = incidence, birth = birth, death = death,
-                  R0 = R0, dur_inf = dur_inf, per_local = 0.90,
-                  p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.8,
+                  R0 = R0, dur_inf = dur_inf, per_local = 0.50,
+                  p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
                   p_sym = p_sym, p_test = p_test, p_positive = p_positive,
                   years1 = 3, years2 = 2, n_runs = 10)
       
