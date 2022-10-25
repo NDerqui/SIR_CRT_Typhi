@@ -609,18 +609,22 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Data for the Poisson regression  
   for_poisson <- sir_output %>%
+    # Eliminate simulations (run-cluster level) in which there was a problem
     mutate(eliminate = case_when(is.na(infected) ~ 1,
                                  infected >= 0 ~ 0)) %>%
     group_by(run, cluster) %>%
     mutate(eliminate = max(eliminate)) %>%
     filter(eliminate == 0) %>%
-    mutate(sus_risk = susceptible*time_step) %>%
-    mutate(vax_risk = vaccinated*time_step) %>%
-    mutate(sus_risk = sum(sus_risk, na.rm = TRUE)/365) %>%
-    mutate(vax_risk = sum(vax_risk, na.rm = TRUE)/365) %>%
+    # Calculate sum of all S in year: estimate incidence per person-year
+    mutate(sus_risk = susceptible) %>%
+    mutate(vax_risk = vaccinated) %>%
+    mutate(sus_risk = sum(sus_risk, na.rm = TRUE)*time_step/365) %>%
+    mutate(vax_risk = sum(vax_risk, na.rm = TRUE)*time_step/365) %>%
+    # Sum all incidence of infection: per vax status and total
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
     mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
+    # Only one obs per run and cluster
     filter(row_number() == 1) %>%
     select(-time_seq, -susceptible, -vaccinated,
            -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
@@ -696,18 +700,15 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   # Direct effect: vax vs unvax in vaccine cluster
   
   sir_direct <- for_poisson %>%
-    
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
     select(run, vaccine, sus_risk, vax_risk, sum_SI, sum_VI) %>%
-    
     # Pivot to get the incidence SI vs VI only
     pivot_longer(-c(run, vaccine, sus_risk, vax_risk),
                  names_to = "vax_incluster", values_to = "incidence") %>%
     # Change names
     mutate(vax_incluster = case_when(vax_incluster == "sum_VI" ~ 1,
                                      vax_incluster == "sum_SI" ~ 0)) %>%
-    
     # Get the total
     mutate(total = case_when(vax_incluster == 1 ~ vax_risk,
                              vax_incluster == 0 ~ sus_risk)) %>%
@@ -751,7 +752,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
     
   sir_indirect <- for_poisson %>%
-      
     # Focus therefore only on incidence S to I
     select(run, vaccine, sum_SI, sus_risk)
     
@@ -792,10 +792,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
     
   sir_total <- for_poisson %>%
-    
     # Select
     select(run, vaccine, sus_risk, vax_risk, sum_VI, sum_all_inc) %>%
-    
     # Get one var with VI only from vaccine clusters,
     # and all incidence from non-vaccine
     mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
@@ -803,7 +801,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     # Get total
     mutate(total = case_when(vaccine == 1 ~ vax_risk,
                              vaccine == 0 ~ sus_risk)) %>%
-    
     # Clean
     select(run, vaccine, incidence, total)
     
@@ -844,13 +841,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
  # Overall effect: all in vaccine cluster vs all in non-vaccine
     
  sir_overall <- for_poisson %>%
-      
    # We are interested in overall incidence
    select(run, vaccine, sus_risk, vax_risk, sum_all_inc) %>%
-   
    # Get total
    mutate(total = sus_risk + vax_risk) %>%
-   
    # Clean
    select(run, vaccine, sum_all_inc, total)
     
@@ -892,6 +886,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   poisson_summary <- matrix(0, nrow = 4, ncol = 4)
   
+  # Fill with the RR estimates
   poisson_summary[1, 1] <- mean(output_direct[,1], na.rm = TRUE)
   poisson_summary[1, 2] <- quantile(output_direct[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
   poisson_summary[1, 3] <- quantile(output_direct[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
@@ -905,27 +900,26 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   poisson_summary[4, 2] <- quantile(output_overall[,1], probs = c(0.025, 0.975), na.rm = TRUE)[1]
   poisson_summary[4, 3] <- quantile(output_overall[,1], probs = c(0.025, 0.975), na.rm = TRUE)[2]
   
+  # Get the power: prop of sims in which the CI do not cross one
+  
   counts_dir <- n_runs
   for (i in 1:n_runs) {
     if(output_direct[i,5] < 1 & output_direct[i,6] >= 1) {
       counts_dir <- counts_dir - 1
     }
   }
-  
   counts_ind <- n_runs
   for (i in 1:n_runs) {
     if(output_indirect[i,5] < 1 & output_indirect[i,6] >= 1) {
       counts_ind <- counts_ind - 1
     }
   }
-  
   counts_tot <- n_runs
   for (i in 1:n_runs) {
     if(output_total[i,5] < 1 & output_total[i,6] >= 1) {
       counts_tot <- counts_tot - 1
     }
   }
-  
   counts_ove <- n_runs
   for (i in 1:n_runs) {
     if(output_overall[i,5] < 1 & output_overall[i,6] >= 1) {
@@ -945,7 +939,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   
   
-  ## Other summary
+  ## ICC-DE summary
   
   other_summary <- matrix(0, nrow = 3, ncol = 4)
   
