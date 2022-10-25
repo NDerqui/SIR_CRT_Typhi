@@ -283,7 +283,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[, 1, i] = cluster_no[i]
       sir_first[, 2, i] = cluster_vstatus[i]
       sir_first[, 4, i] = cluster_n[i]
-      sir_first[, 6, i] = as.positive(incidence*sir_first[, 4, i]*7)         # Initial I depends on incidence rate
+      sir_first[, 6, i] = as.positive(incidence*sir_first[, 4, i]*dur_inf)   # Initial I depends on incidence rate x duration infectiousness
       sir_first[, 5, i] = as.positive((sir_first[, 4 ,i]-sir_first[, 6, i])) # Initial S depends on N - I
       sir_first[, 7, i] = 0
     }
