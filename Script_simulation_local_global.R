@@ -53,10 +53,11 @@ death <- 0.007        # 7 per 1,000
 
 # (infections/time): beta = R0/Duration of infectiousness
 
-R0 <- 2            # Basic reproduction number
+R0 <- 2            # Basic reproduction number: to explore
 dur_inf <- 7       # Duration of infectiousness (days)
 
-# Percentage of local transmission, the rest of global transmission
+# Percentage of local transmission (in the same cluster),
+# the rest of global transmission (external clusters)
 
 per_local <- 0.95
 
@@ -65,7 +66,7 @@ per_local <- 0.95
 
 p_vax <- 0.5       # Proportion of vaccinated population in vaccine clusters
 p_clusvax <- 0.5   # Proportion of clusters assigned to vaccine
-vax_eff <- 0.7     # Vaccine effectiveness (infection)
+vax_eff <- 0.7     # Direct vaccine efficacy (infection)
 
 
 #### Detected infections ####
@@ -90,7 +91,7 @@ random_cluster <- 1
 
 
 
-# FUNCTION -------------------------------------------------------------
+# FUNCTIONS -------------------------------------------------------------
 
 
 as.positive <- function(x) {
