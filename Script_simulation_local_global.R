@@ -568,75 +568,44 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Results from all the runs
   
-  # Plot
-  
-  sir_vax_plot <- ggplot(data = sir_output) +
-    geom_line(data = filter(sir_output, vaccine == 1),
-              mapping = aes(x = time_seq, y = infected, group = run,
-                            color = "Inf_Vax")) +
-    geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq, y = infected, group = run,
-                            color = "Inf_No")) +
-    geom_line(data = filter(sir_output, vaccine == 1),
-              mapping = aes(x = time_seq, y = observed, group = run,
-                            color = "Obs_Vax")) +
-    geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq, y = observed, group = run,
-                            color = "Obs_No")) +
-    scale_color_manual(name = NULL,
-                       breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
-                       values = c("Inf_Vax" = "limegreen",
-                                  "Inf_No" = "firebrick",
-                                  "Obs_Vax" = "greenyellow",
-                                  "Obs_No" = "red"),
-                       labels = c("Infections in vaccine clusters",
-                                  "Infections in non-vaccine clusters",
-                                  "Detected infections in vaccine clusters",
-                                  "Detected infections in non-vaccine cluster")) +
-    theme_classic() +
-    labs(title = paste0("Incidence over time in n = ", C, " clusters"),
-         x = paste0("Time over n = ", years2, " years (days)"),
-         y = "Number of infections/detected infections") +
-    theme(
-      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
-      axis.title.x = element_text(size = rel(1.1), face="bold"),
-      axis.title.y = element_text(size = rel(1.1), face="bold"),
-      axis.text = element_text(size=rel(1)),
-      legend.position = "bottom",
-      legend.text = element_text(size=rel(1))) +
-    facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
-                ncol = nrow(cluster_map))
-  
   # Summarize the results
   
-  ## Total infections
-  summary <- sir_output %>%
-    group_by(run, cluster) %>%
+  ## Total incidence of infection in the 2 years
+  incidence_plot <- sir_output %>%
+    # Sum all the incident infections for each vax arm by run
+    group_by(run, vaccine) %>%
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
     mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
-    mutate(sum_all_inc = sum_SI + sum_VI) %>%
-    filter(row_number() == 1) %>%
-    select(-susceptible, -vaccinated, -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    mutate(total_obs_inc_by_vax = sum_SI + sum_VI) %>%
+    # Get only the observed
+    mutate(total_obs_inc_by_vax = total_obs_inc_by_vax*mu) %>%
     ungroup() %>%
+    # Sum all the incident infections for both arms by run
+    group_by(run) %>%
+    mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
+    mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
+    mutate(total_obs_inc_all = sum_SI + sum_VI) %>%
+    # Get only the observed
+    mutate(total_obs_inc_all = total_obs_inc_all*mu) %>%
+    ungroup() %>%
+    # Delete unnecessary cols and rows
     group_by(run, vaccine) %>%
-    mutate(Sum_Vax_clusters_SI = case_when(vaccine == 1 ~ sum(sum_SI, na.rm = TRUE))) %>%
-    mutate(Sum_Vax_clusters_VI = case_when(vaccine == 1 ~ sum(sum_VI, na.rm = TRUE))) %>%
-    mutate(Sum_NoVax_clusters_SI = case_when(vaccine == 0 ~ sum(sum_SI, na.rm = TRUE))) %>%
-    mutate(Sum_Vax_clusters_all = case_when(vaccine == 1 ~ sum(sum_all_inc, na.rm = TRUE))) %>%
-    mutate(Sum_NoVax_clusters_all = case_when(vaccine == 0 ~ sum(sum_all_inc, na.rm = TRUE))) %>%
     filter(row_number() == 1) %>%
-    select(-cluster, -time_seq, -sum_SI, -sum_VI, -sum_all_inc) %>%
+    select(run, vaccine, total_obs_inc_by_vax, total_obs_inc_all) %>%
     ungroup() %>%
-    group_by(vaccine) %>%
-    mutate(Sum_Vax_clusters_SI = mean(Sum_Vax_clusters_SI, na.rm = TRUE)) %>%
-    mutate(Sum_Vax_clusters_VI = mean(Sum_Vax_clusters_VI, na.rm = TRUE)) %>%
-    mutate(Sum_NoVax_clusters_SI = mean(Sum_NoVax_clusters_SI, na.rm = TRUE)) %>%
-    mutate(Sum_Vax_clusters_all = mean(Sum_Vax_clusters_all, na.rm = TRUE)) %>%
-    mutate(Sum_NoVax_clusters_all = mean(Sum_NoVax_clusters_all, na.rm = TRUE)) %>%
+    # Incidence per year
+    mutate(total_obs_inc_by_vax = total_obs_inc_by_vax/years2) %>%
+    mutate(total_obs_inc_all = total_obs_inc_all/years2) %>%
+    # Pivot the results
+    pivot_wider(id_cols = c(run, total_obs_inc_all), names_from = vaccine, values_from = total_obs_inc_by_vax)
+  colnames(incidence_plot) <- c("run", "total_obs_inc_All", "total_obs_inc_Vax", "total_obs_inc_NoVax")
+  
+  summary <- incidence_plot %>%
+    mutate(total_obs_inc_All = mean(total_obs_inc_All, na.rm = TRUE)) %>%
+    mutate(total_obs_inc_Vax = mean(total_obs_inc_Vax, na.rm = TRUE)) %>%
+    mutate(total_obs_inc_NoVax = mean(total_obs_inc_NoVax, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
-    select(-run) %>%
-    ungroup()
-  rownames(summary) <- c("Mean_Runs_Vax", "Mean_Runs_NoVax")
+    select(-run)
   
   ## Data for the Poisson regression  
   for_poisson <- sir_output %>%
@@ -679,6 +648,45 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(des_eff = 1 + (mean(cluster_n) - 1)*icc) %>%
     ungroup() %>%
     as.data.frame()
+  
+  # Plot
+  
+  sir_vax_plot <- ggplot(data = sir_output) +
+    geom_line(data = filter(sir_output, vaccine == 1),
+              mapping = aes(x = time_seq, y = infected, group = run,
+                            color = "Inf_Vax")) +
+    geom_line(data = filter(sir_output, vaccine == 0),
+              mapping = aes(x = time_seq, y = infected, group = run,
+                            color = "Inf_No")) +
+    geom_line(data = filter(sir_output, vaccine == 1),
+              mapping = aes(x = time_seq, y = observed, group = run,
+                            color = "Obs_Vax")) +
+    geom_line(data = filter(sir_output, vaccine == 0),
+              mapping = aes(x = time_seq, y = observed, group = run,
+                            color = "Obs_No")) +
+    scale_color_manual(name = NULL,
+                       breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
+                       values = c("Inf_Vax" = "limegreen",
+                                  "Inf_No" = "firebrick",
+                                  "Obs_Vax" = "greenyellow",
+                                  "Obs_No" = "red"),
+                       labels = c("Infections in vaccine clusters",
+                                  "Infections in non-vaccine clusters",
+                                  "Detected infections in vaccine clusters",
+                                  "Detected infections in non-vaccine cluster")) +
+    theme_classic() +
+    labs(title = paste0("Incidence over time in n = ", C, " clusters"),
+         x = paste0("Time over n = ", years2, " years (days)"),
+         y = "Number of infections/detected infections") +
+    theme(
+      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
+      axis.title.x = element_text(size = rel(1.1), face="bold"),
+      axis.title.y = element_text(size = rel(1.1), face="bold"),
+      axis.text = element_text(size=rel(1)),
+      legend.position = "bottom",
+      legend.text = element_text(size=rel(1))) +
+    facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
+               ncol = nrow(cluster_map))
   
   
   
