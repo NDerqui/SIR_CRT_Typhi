@@ -1017,7 +1017,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0(" C=", C, " sd=", sd, " PerLocal=", per_local, " N=", N,
+  name_simulation <- paste0("C=", C, " sd=", sd, " PerLocal=", per_local, " N=", N,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -1097,7 +1097,7 @@ hist(run[[3]], main = "Histogram of clusters' population",
 dev.off()
 
 png(paste0("Results/", Sys.Date(), "/", name,"/Incidence_plot.png"),
-    width = 14, height = 9, units = 'in', res = 600)
+    width = 9.2, height = 4, units = 'in', res = 600)
 run[[4]]
 dev.off()
 
