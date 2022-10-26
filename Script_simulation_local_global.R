@@ -746,7 +746,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       axis.text = element_text(size=rel(1), face="bold"),
       legend.position = "right",
       legend.text = element_text(size=rel(1)))
-  ggarrange(plot_a, plot_b,
+  incidence_plot <- ggarrange(plot_a, plot_b,
             common.legend = TRUE, legend = "bottom")
   
   
@@ -1021,14 +1021,14 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
-                                  " R0=", R0, " DurationInf=", dur_inf, 
+                                  " Mean_R0=", mean(R0), " DurationInf=", dur_inf, 
                                   " ProbSymp=", p_sym, " ProbTest=", p_test, " ProbPos=", p_positive,
                                   " YearsEq=", years1, " YearsVax=", years2)
   
   list <- list(name_simulation = name_simulation,
                other_characteristics = other_characteristics,
                cluster_pop = cluster_n,
-               sir_vax_plot = sir_vax_plot,
+               incidence_plot = incidence_plot,
                summary_infections = summary,
                output_direct = output_direct,
                output_indirect = output_indirect,
@@ -1096,13 +1096,13 @@ hist(run[[3]], main = "Histogram of clusters' population",
      xlab = "Clusters' population", ylab = "Frequency of clusters")
 dev.off()
 
-png(paste0("Results/", Sys.Date(), "/", name,"/Infections_after_vax.png"),
+png(paste0("Results/", Sys.Date(), "/", name,"/Incidence_plot.png"),
     width = 14, height = 9, units = 'in', res = 600)
 run[[4]]
 dev.off()
 
 write.xlsx(as.data.frame(run[[5]]), rowNames = TRUE,
-           paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
+           paste0("Results/", Sys.Date(), "/", name,"/Total_Incidence.xlsx"))
 
 write.xlsx(as.data.frame(run[[6]]), rowNames = TRUE,
            paste0("Results/", Sys.Date(), "/", name,"/RR_Direct_Effect.xlsx"))
