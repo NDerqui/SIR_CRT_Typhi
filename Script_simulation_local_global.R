@@ -598,12 +598,19 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(total_obs_inc_all = total_obs_inc_all/years2) %>%
     # Pivot the results
     pivot_wider(id_cols = c(run, total_obs_inc_all), names_from = vaccine, values_from = total_obs_inc_by_vax)
-  colnames(incidence_plot) <- c("run", "total_obs_inc_All", "total_obs_inc_Vax", "total_obs_inc_NoVax")
+  colnames(incidence_plot) <- c("run", "Total_inc_year", "Vax_inc_year", "NoVax_inc_year")
+  incidence_plot <- incidence_plot %>%
+    mutate(Total_inc_year_1000 = Total_inc_year*1000/N) %>%
+    mutate(Vax_inc_year_1000 = Vax_inc_year*1000/N) %>%
+    mutate(NoVax_inc_year_1000 = NoVax_inc_year*1000/N) 
   
   summary <- incidence_plot %>%
-    mutate(total_obs_inc_All = mean(total_obs_inc_All, na.rm = TRUE)) %>%
-    mutate(total_obs_inc_Vax = mean(total_obs_inc_Vax, na.rm = TRUE)) %>%
-    mutate(total_obs_inc_NoVax = mean(total_obs_inc_NoVax, na.rm = TRUE)) %>%
+    mutate(Total_inc_year = mean(Total_inc_year, na.rm = TRUE)) %>%
+    mutate(Total_inc_year_1000 = mean(Total_inc_year_1000, na.rm = TRUE)) %>%
+    mutate(Vax_inc_year = mean(Vax_inc_year, na.rm = TRUE)) %>%
+    mutate(Vax_inc_year_1000 = mean(Vax_inc_year_1000, na.rm = TRUE)) %>%
+    mutate(NoVax_inc_year = mean(NoVax_inc_year, na.rm = TRUE)) %>%
+    mutate(NoVax_inc_year_1000 = mean(NoVax_inc_year_1000, na.rm = TRUE)) %>%
     filter(row_number() == 1) %>%
     select(-run)
   
@@ -655,19 +662,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Plot
   
-  sir_vax_plot <- ggplot(data = sir_output) +
-    geom_line(data = filter(sir_output, vaccine == 1),
-              mapping = aes(x = time_seq, y = infected, group = run,
-                            color = "Inf_Vax")) +
-    geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq, y = infected, group = run,
-                            color = "Inf_No")) +
-    geom_line(data = filter(sir_output, vaccine == 1),
-              mapping = aes(x = time_seq, y = observed, group = run,
-                            color = "Obs_Vax")) +
-    geom_line(data = filter(sir_output, vaccine == 0),
-              mapping = aes(x = time_seq, y = observed, group = run,
-                            color = "Obs_No")) +
+  sir_vax_plot <- ggplot(data = incidence_plot) +
+    geom_boxplot(mapping = aes(y = Total_inc_year, x = "All", color = "All")) +
+    geom_boxplot(mapping = aes(y = Vax_inc_year, x = "Vax", color = "Vax")) +
+    geom_boxplot(mapping = aes(y = NoVax_inc_year, x = "NoVax", color = "NoVax")) +
     scale_color_manual(name = NULL,
                        breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
                        values = c("Inf_Vax" = "limegreen",
