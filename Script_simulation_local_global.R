@@ -703,7 +703,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     scale_x_discrete(name = NULL,
                      breaks = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year"),
                      labels = c("Vaccine clusters", "Non-vaccine clusters", "All clusters")) +
-    scale_y_continuous(name = "Incident infections per year") +
+    scale_y_continuous(name = "Incidence per year") +
     labs(title = "A") +
     theme_minimal() +
     theme(
@@ -736,7 +736,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     scale_x_discrete(name = NULL,
                      breaks = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000"),
                      labels = c("Vaccine clusters", "Non-vaccine clusters", "All clusters")) +
-    scale_y_continuous(name = "Incident infections/1,000 inhabitants per year") +
+    scale_y_continuous(name = "Incidence per 1,000 & per year") +
     labs(title = "B") +
     theme_minimal() +
     theme(
