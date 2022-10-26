@@ -622,7 +622,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     group_by(run, cluster) %>%
     mutate(eliminate = max(eliminate)) %>%
     filter(eliminate == 0) %>%
-    # Calculate sum of all S in year: estimate incidence per person-year
+    ungroup() %>%
+    # Aim: : estimate incidence per person-year
+    # Calculate sum of all susceptible (or vaccinated) in year
+    group_by(run, vaccine) %>%
     mutate(sus_risk = susceptible) %>%
     mutate(vax_risk = vaccinated) %>%
     mutate(sus_risk = sum(sus_risk, na.rm = TRUE)*time_step/365) %>%
@@ -633,7 +636,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
     # Only one obs per run and cluster
     filter(row_number() == 1) %>%
-    select(-time_seq, -susceptible, -vaccinated,
+    select(-time_seq, -cluster, -eliminate, -susceptible, -vaccinated,
            -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
   
