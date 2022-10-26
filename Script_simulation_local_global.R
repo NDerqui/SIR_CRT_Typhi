@@ -572,6 +572,13 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Total incidence of infection in the 2 years
   incidence_plot <- sir_output %>%
+    # Eliminate simulations (run-cluster level) in which there was a problem
+    mutate(eliminate = case_when(is.na(infected) ~ 1,
+                                 infected >= 0 ~ 0)) %>%
+    group_by(run, cluster) %>%
+    mutate(eliminate = max(eliminate)) %>%
+    filter(eliminate == 0) %>%
+    ungroup() %>%
     # Sum all the incident infections for each vax arm by run
     group_by(run, vaccine) %>%
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
