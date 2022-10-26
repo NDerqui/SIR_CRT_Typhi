@@ -604,8 +604,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(total_obs_inc_by_vax = total_obs_inc_by_vax/years2) %>%
     mutate(total_obs_inc_all = total_obs_inc_all/years2) %>%
     # Pivot the results
-    pivot_wider(id_cols = c(run, total_obs_inc_all), names_from = vaccine, values_from = total_obs_inc_by_vax)
+    pivot_wider(id_cols = c(run, total_obs_inc_all),
+                names_from = vaccine, values_from = total_obs_inc_by_vax)
   colnames(incidence_plot) <- c("run", "Total_inc_year", "Vax_inc_year", "NoVax_inc_year")
+  # Incidence per 1,000 people
   incidence_plot <- incidence_plot %>%
     mutate(Total_inc_year_1000 = Total_inc_year*1000/N) %>%
     mutate(Vax_inc_year_1000 = Vax_inc_year*1000/N) %>%
