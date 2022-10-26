@@ -643,6 +643,10 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     mutate(sum_SI = sum(inc_sus_inf, na.rm = TRUE)) %>%
     mutate(sum_VI = sum(inc_vax_inf, na.rm = TRUE)) %>%
     mutate(sum_all_inc = sum_SI + sum_VI) %>%
+    # Get only the observed
+    mutate(sum_SI = sum_SI*mu) %>%
+    mutate(sum_VI = sum_VI*mu) %>%
+    mutate(sum_all_inc = sum_all_inc*mu) %>%
     # Only one obs per run and cluster
     filter(row_number() == 1) %>%
     select(-time_seq, -cluster, -eliminate, -susceptible, -vaccinated,
