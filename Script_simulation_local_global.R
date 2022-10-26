@@ -665,33 +665,76 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Plot
   
-  sir_vax_plot <- ggplot(data = incidence_plot) +
-    geom_boxplot(mapping = aes(y = Total_inc_year, x = "All", color = "All")) +
-    geom_boxplot(mapping = aes(y = Vax_inc_year, x = "Vax", color = "Vax")) +
-    geom_boxplot(mapping = aes(y = NoVax_inc_year, x = "NoVax", color = "NoVax")) +
+  require(wesanderson)
+  require(ggpubr)
+  plot_a_data <- incidence_plot %>%
+    select(run, Vax_inc_year, NoVax_inc_year, Total_inc_year) %>%
+    pivot_longer(-run)
+  plot_a <- ggplot(data = plot_a_data) +
+    geom_boxplot(mapping = aes(x = factor(name, level = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year")),
+                               y = value, color = name, fill = name), alpha = 0.2) +
+    geom_jitter(mapping = aes(x = factor(name, level = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year")),
+                              y = value, color = name, fill = name), size = 1.5) +
     scale_color_manual(name = NULL,
-                       breaks = c("Inf_Vax", "Inf_No", "Obs_Vax", "Obs_No"),
-                       values = c("Inf_Vax" = "limegreen",
-                                  "Inf_No" = "firebrick",
-                                  "Obs_Vax" = "greenyellow",
-                                  "Obs_No" = "red"),
-                       labels = c("Infections in vaccine clusters",
-                                  "Infections in non-vaccine clusters",
-                                  "Detected infections in vaccine clusters",
-                                  "Detected infections in non-vaccine cluster")) +
-    theme_classic() +
-    labs(title = paste0("Incidence over time in n = ", C, " clusters"),
-         x = paste0("Time over n = ", years2, " years (days)"),
-         y = "Number of infections/detected infections") +
+                       breaks = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year"),
+                       values = c(wes_palette("GrandBudapest1", n = 3)),
+                       labels = c("Incidence in vaccine clusters",
+                                  "Incidence in non-vaccine clusters",
+                                  "Incidence in all clusters")) +
+    scale_fill_manual(name = NULL,
+                       breaks = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year"),
+                       values = c(wes_palette("GrandBudapest1", n = 3)),
+                       labels = c("Incidence in vaccine clusters",
+                                  "Incidence in non-vaccine clusters",
+                                  "Incidence in all clusters")) +
+    scale_x_discrete(name = NULL,
+                     breaks = c("Vax_inc_year", "NoVax_inc_year", "Total_inc_year"),
+                     labels = c("Vaccine clusters", "Non-vaccine clusters", "All clusters")) +
+    scale_y_continuous(name = "Incident infections per year") +
+    labs(title = "A") +
+    theme_minimal() +
     theme(
-      plot.title = element_text(size = rel(1.2), face="bold", hjust = 0.5),
+      plot.title = element_text(size = rel(1.2), face="bold"),
       axis.title.x = element_text(size = rel(1.1), face="bold"),
       axis.title.y = element_text(size = rel(1.1), face="bold"),
-      axis.text = element_text(size=rel(1)),
-      legend.position = "bottom",
-      legend.text = element_text(size=rel(1))) +
-    facet_wrap(~fct_relevel(as.character(cluster), as.character(cluster_map)),
-               ncol = nrow(cluster_map))
+      axis.text = element_text(size=rel(1), face="bold"),
+      legend.position = "right",
+      legend.text = element_text(size=rel(1)))
+  plot_b_data <- incidence_plot %>%
+    select(run, Vax_inc_year_1000, NoVax_inc_year_1000, Total_inc_year_1000) %>%
+    pivot_longer(-run)
+  plot_b <- ggplot(data = plot_b_data) +
+    geom_boxplot(mapping = aes(x = factor(name, level = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000")),
+                               y = value, color = name, fill = name), alpha = 0.2) +
+    geom_jitter(mapping = aes(x = factor(name, level = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000")),
+                              y = value, color = name, fill = name), size = 1.5) +
+    scale_color_manual(name = NULL,
+                       breaks = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000"),
+                       values = c(wes_palette("GrandBudapest1", n = 3)),
+                       labels = c("Incidence in vaccine clusters",
+                                  "Incidence in non-vaccine clusters",
+                                  "Incidence in all clusters")) +
+    scale_fill_manual(name = NULL,
+                      breaks = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000"),
+                      values = c(wes_palette("GrandBudapest1", n = 3)),
+                      labels = c("Incidence in vaccine clusters",
+                                 "Incidence in non-vaccine clusters",
+                                 "Incidence in all clusters")) +
+    scale_x_discrete(name = NULL,
+                     breaks = c("Vax_inc_year_1000", "NoVax_inc_year_1000", "Total_inc_year_1000"),
+                     labels = c("Vaccine clusters", "Non-vaccine clusters", "All clusters")) +
+    scale_y_continuous(name = "Incident infections/1,000 inhabitants per year") +
+    labs(title = "B") +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = rel(1.2), face="bold"),
+      axis.title.x = element_text(size = rel(1.1), face="bold"),
+      axis.title.y = element_text(size = rel(1.1), face="bold"),
+      axis.text = element_text(size=rel(1), face="bold"),
+      legend.position = "right",
+      legend.text = element_text(size=rel(1)))
+  ggarrange(plot_a, plot_b,
+            common.legend = TRUE, legend = "bottom")
   
   
   
