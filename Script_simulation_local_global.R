@@ -1167,7 +1167,7 @@ for (i in 1:length(pop_list)) {
       
       png(paste0("Results/", Sys.Date(), "/", name,"/Infections_after_vax.png"),
           width = 14, height = 9, units = 'in', res = 600)
-      run[[4]]
+      print(run[[4]])
       dev.off()
       
       write.xlsx(as.data.frame(run[[5]]), rowNames = TRUE,
