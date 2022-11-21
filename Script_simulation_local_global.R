@@ -1202,7 +1202,7 @@ for (i in 1:length(pop_list)) {
 
 # First, explore R0 with N = 72,000 (70 clusters)
 
-r0_list <- c(1, 1.2, 1.5, 1.7, 2)
+r0_list <- c(0.2, 0.3, 0.4, 0.5, 0.7 1, 1.2, 1.5, 2)
 sd_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
 
