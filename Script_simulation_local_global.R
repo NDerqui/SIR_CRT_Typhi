@@ -1128,6 +1128,8 @@ saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_re
 # These are the conditions in which I am exploring R0:
 # 3 y to eq; 2 y with vax; 30 runs
 
+# R0 general analyses to be continued with 1.7, 1.5, 1.2
+
 pop_list <- c(200000, 100000, 50000, 20000, 10000)
 sd_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
@@ -1152,6 +1154,78 @@ for (i in 1:length(pop_list)) {
       # Give name to simulation
       
       name <- run[[1]]
+      
+      dir.create(here(paste0("Results/", Sys.Date(), "/", name)),recursive = TRUE)
+      
+      # Save
+      
+      write.table(run[[2]], file = paste0("Results/", Sys.Date(), "/", name,"/characteristics.txt"))
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Pop_Hist.png"),
+          width = 9, height = 5, units = 'in', res = 600)
+      hist(run[[3]], main = "Histogram of clusters' population",
+           xlab = "Clusters' population", ylab = "Frequency of clusters")
+      dev.off()
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Infections_after_vax.png"),
+          width = 14, height = 9, units = 'in', res = 600)
+      print(run[[4]])
+      dev.off()
+      
+      write.xlsx(as.data.frame(run[[5]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[6]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Direct_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[7]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Indirect_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Overall_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Total_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Summary_RR_Effects.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/IntraCC_DesignEffect.xlsx"))
+      write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Other_sum.xlsx"))
+      
+      saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_reference.Rds"))
+      
+    }
+  }
+}
+
+
+# Loop to explore the trial's conditions
+
+# First, explore R0 with N = 72,000 (70 clusters)
+
+r0_list <- c(1, 1.2, 1.5, 1.7, 2)
+sd_list <- c(0.01, 0.2)
+cover_list <- c(0.5, 0.7, 0.9)
+
+for (i in 1:length(r0_list)) {
+  
+  for (j in 1:length(sd_list)) {
+    
+    for (k in 1:length(cover_list)) {
+      
+      run <- main(N = 72000, C = 70, sd = sd_list[j],
+                  incidence = incidence, birth = birth, death = death,
+                  R0 = r0_list[i], dur_inf = dur_inf, per_local = 0.5,
+                  p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
+                  p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                  years1 = 3, years2 = 2, n_runs = 30)
+      
+      # Directory
+      
+      dir.create(here("Results/", Sys.Date()),recursive = TRUE)
+      
+      # Give name to simulation
+      
+      name <- paste0("R=", r0_list[i], " ", run[[1]])
       
       dir.create(here(paste0("Results/", Sys.Date(), "/", name)),recursive = TRUE)
       
