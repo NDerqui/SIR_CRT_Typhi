@@ -23,6 +23,8 @@ library(lmtest)
 library(forcats)
 library(DescTools)
 library(svMisc)
+library(wesanderson)
+library(ggpubr)
 
 
 
@@ -678,8 +680,6 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Plot
   
-  require(wesanderson)
-  require(ggpubr)
   plot_a_data <- incidence_plot %>%
     select(run, Vax_inc_year, NoVax_inc_year, Total_inc_year) %>%
     pivot_longer(-run)
@@ -1125,6 +1125,9 @@ saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_re
 
 #### Do in a loop ####
 
+# These are the conditions in which I am exploring R0:
+# 3 y to eq; 2 y with vax; 30 runs
+
 pop_list <- c(200000, 100000, 50000, 20000, 10000)
 sd_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
@@ -1135,12 +1138,12 @@ for (i in 1:length(pop_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = pop_list[i], C = 10, sd = sd_list[j],
+      run <- main(N = pop_list[i], C = 80, sd = sd_list[j],
                   incidence = incidence, birth = birth, death = death,
-                  R0 = R0, dur_inf = dur_inf, per_local = 0.50,
+                  R0 = 2, dur_inf = dur_inf, per_local = 0.5,
                   p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
                   p_sym = p_sym, p_test = p_test, p_positive = p_positive,
-                  years1 = 3, years2 = 2, n_runs = 10)
+                  years1 = 3, years2 = 2, n_runs = 30)
       
       # Directory
       
