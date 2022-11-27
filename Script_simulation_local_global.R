@@ -1202,7 +1202,7 @@ for (i in 1:length(pop_list)) {
 
 # First, explore R0 with N = 72,000 (70 clusters)
 
-r0_list <- c(0.2, 0.3, 0.4, 0.5, 0.7 1, 1.2, 1.5, 2)
+r0_list <- c(0.2, 0.3, 0.4, 0.5, 0.7, 1, 1.2, 1.5, 2)
 sd_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
 
@@ -1212,7 +1212,7 @@ for (i in 1:length(r0_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = 72000, C = 70, sd = sd_list[j],
+      run <- main(N = 72000, C = 100, sd = sd_list[j],
                   incidence = incidence, birth = birth, death = death,
                   R0 = r0_list[i], dur_inf = dur_inf, per_local = 0.5,
                   p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
