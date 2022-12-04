@@ -1268,3 +1268,72 @@ for (i in 1:length(r0_list)) {
     }
   }
 }
+
+# Then, explore C with N = 72,000 with R0 = 0.2
+
+cluster_list <- c(36, 52, 68, 84, 120)
+sd_list <- c(0.01, 0.2)
+cover_list <- c(0.7, 0.75, 0.80, 0.85)
+
+for (i in 1:length(cluster_list)) {
+  
+  for (j in 1:length(sd_list)) {
+    
+    for (k in 1:length(cover_list)) {
+      
+      run <- main(N = 72000, C = cluster_list[i], sd = sd_list[j],
+                  incidence = incidence, birth = birth, death = death,
+                  R0 = 0.2, dur_inf = dur_inf, per_local = 0.5,
+                  p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
+                  p_sym = p_sym, p_test = p_test, p_positive = p_positive,
+                  years1 = 3, years2 = 2, n_runs = 30)
+      
+      # Directory
+      
+      dir.create(here("Results/", Sys.Date()),recursive = TRUE)
+      
+      # Give name to simulation
+      
+      name <- run[[1]]
+      
+      dir.create(here(paste0("Results/", Sys.Date(), "/", name)),recursive = TRUE)
+      
+      # Save
+      
+      write.table(run[[2]], file = paste0("Results/", Sys.Date(), "/", name,"/characteristics.txt"))
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Cluster_Pop_Hist.png"),
+          width = 9, height = 5, units = 'in', res = 600)
+      hist(run[[3]], main = "Histogram of clusters' population",
+           xlab = "Clusters' population", ylab = "Frequency of clusters")
+      dev.off()
+      
+      png(paste0("Results/", Sys.Date(), "/", name,"/Infections_after_vax.png"),
+          width = 14, height = 9, units = 'in', res = 600)
+      print(run[[4]])
+      dev.off()
+      
+      write.xlsx(as.data.frame(run[[5]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Total_Infections.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[6]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Direct_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[7]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Indirect_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[8]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Overall_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[9]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/RR_Total_Effect.xlsx"))
+      write.xlsx(as.data.frame(run[[10]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Summary_RR_Effects.xlsx"))
+      
+      write.xlsx(as.data.frame(run[[11]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/IntraCC_DesignEffect.xlsx"))
+      write.xlsx(as.data.frame(run[[12]]), rowNames = TRUE,
+                 paste0("Results/", Sys.Date(), "/", name,"/Other_sum.xlsx"))
+      
+      saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_reference.Rds"))
+      
+    }
+  }
+}
