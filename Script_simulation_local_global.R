@@ -284,8 +284,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         
         # From S to I
         
-        sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +
-          (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir_first[i-1, 6,], na.rm = TRUE)/sum(sir_first[i-1, 4,], na.rm = TRUE)
+        sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6,])/sum(sir_first[i-1, 4,]))
         sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
         sir_first[i, 10, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j])))
         
@@ -378,8 +377,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         
         # From S to I
         
-        sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +
-          (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir[i-1, 7,], na.rm = TRUE)/sum(sir[i-1, 4,], na.rm = TRUE) 
+        sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7,])/sum(sir[i-1, 4,])) 
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
         sir[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j])))
         
