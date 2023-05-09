@@ -280,7 +280,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     for (i in 2:length(time_seq1)) {
       
-      for (j in sample(1:C)) {
+      for (j in 1:C) {
         
         # From S to I
         
@@ -374,7 +374,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     for (i in 2:length(time_seq2)) {
       
-      for (j in sample(1:C)) {
+      for (j in 1:C) {
         
         # From S to I
         
