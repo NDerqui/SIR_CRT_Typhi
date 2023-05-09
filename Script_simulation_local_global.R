@@ -359,9 +359,9 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     }
     
     for (i in 1:C) {
-      if (sir[1, 2, i] == 1) {                                          # In vaccinated clusters
-        sir[, 5, i] = abs(as.integer(equilibrium_result[i, 5]*(1 - p_vax))) # S=S*(1-COVERAGE)
-        sir[, 6, i] = abs(as.integer(equilibrium_result[i, 5]*p_vax))       # V=S*COVERAGE
+      if (sir[1, 2, i] == 1) {                                                                   # In vaccinated clusters
+        sir[, 5, i] = equilibrium_result[i, 5] - abs(as.integer(equilibrium_result[i, 5]*p_vax)) # S=S*(1-COVERAGE)
+        sir[, 6, i] = abs(as.integer(equilibrium_result[i, 5]*p_vax))                            # V=S*COVERAGE
         
       } else {                                   # In non-vax clusters
         sir[, 5, i] = equilibrium_result[i, 5]   # Susceptible are all S from simulation
