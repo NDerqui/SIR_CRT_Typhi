@@ -448,21 +448,21 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     sir_res_observed <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_observed) <- names_matrix2
     for (i in 1:C) {
-      sir_res_observed[,i] <- round(sir[,7,i]*mu, digits = 0)
+      sir_res_observed[,i] <- round(rbinom(n = 1, size = sir[,7,i], prob = mu), digits = 0)
     }
     
     ## Detected incidence of infection from S
     sir_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_SI) <- names_matrix2
     for (i in 1:C) {
-      sir_res_inc_SI[,i] <- round(sir[,11,i]*mu, digits = 0)
+      sir_res_inc_SI[,i] <- round(rbinom(n = 1, size = sir[,11,i], prob = mu), digits = 0)
     }
     
     ## Detected incidence of infection from V
     sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_VI) <- names_matrix2
     for (i in 1:C) {
-      sir_res_inc_VI[,i] <- round(sir[,13,i]*mu, digits = 0)
+      sir_res_inc_VI[,i] <- round(rbinom(n = 1, size = sir[,13,i], prob = mu), digits = 0)
     }
     
     ## Pivot the results and merge all together
