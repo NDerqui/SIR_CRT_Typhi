@@ -96,20 +96,6 @@ random_cluster <- 1
 # FUNCTIONS -------------------------------------------------------------
 
 
-as.positive <- function(x) {
-  
-  for (i in 1:length(x)) {
-    
-    x[i] <- round(x[i], digits = 0)
-    
-    ifelse(x[i] >= 0, x[i] <- x[i], x[i] <- 0)
-  
-  }
-  
-  x
-}
-
-
 main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
                    incidence, birth, death,       # Incidence, birth and death rate
                    R0, dur_inf, per_local,        # Infection parameters & % of local trans
@@ -127,7 +113,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Population in each cluster vector
   
-  n <- as.positive(rnorm(n = C, mean = N/C, sd = sd*N/C))
+  n <- as.integer(rnorm(n = C, mean = N/C, sd = sd*N/C))
   cluster_n <- abs(n)
   
   # Cluster (and vaccine allocation) distribution
@@ -149,7 +135,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     # Vaccination status of clusters
     # Vaccination of the first half of clusters (randomly located)
     
-    V <- C*p_clusvax  
+    V <- as.integer(C*p_clusvax)  
     
     if (C %% 2 == 0) {
       cluster_vstatus <- c(rep(1, times = V), rep(0, times = V))   
@@ -285,8 +271,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
       sir_first[, 1, i] = cluster_no[i]
       sir_first[, 2, i] = cluster_vstatus[i]
       sir_first[, 4, i] = cluster_n[i]
-      sir_first[, 6, i] = as.positive(incidence*sir_first[, 4, i]*dur_inf)   # Initial I depends on incidence rate x duration infectiousness
-      sir_first[, 5, i] = as.positive((sir_first[, 4 ,i]-sir_first[, 6, i])) # Initial S depends on N - I
+      sir_first[, 6, i] = abs(as.integer(incidence*sir_first[, 4, i]*dur_inf))   # Initial I depends on incidence rate x duration infectiousness
+      sir_first[, 5, i] = sir_first[, 4 ,i]-sir_first[, 6, i]                    # Initial S depends on N - I
       sir_first[, 7, i] = 0
     }
     
@@ -301,29 +287,29 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir_first[i, 8, j] = per_local*beta[j]*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] +
           (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir_first[i-1, 6,], na.rm = TRUE)/sum(sir_first[i-1, 4,], na.rm = TRUE)
         sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
-        sir_first[i, 10, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j]))
+        sir_first[i, 10, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j])))
         
         # From I to R
         
         sir_first[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir_first[i, 12, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j])) 
+        sir_first[i, 12, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j]))) 
         
         # Deaths
         
         sir_first[i, 13, j] = (1 - exp(-death*time_step))  
-        sir_first[i, 14, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j])) 
-        sir_first[i, 15, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j])) 
-        sir_first[i, 16, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j])) 
+        sir_first[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j])))
+        sir_first[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j])))
+        sir_first[i, 16, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j])))
         
         # Births
         
         sir_first[i, 17, j] = (1 - exp(-birth*time_step))  
-        sir_first[i, 18, j] = as.positive(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j])) 
+        sir_first[i, 18, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j]))) 
         
         # Model equations
-        sir_first[i, 5, j] = as.positive(sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j])
-        sir_first[i, 6, j] = as.positive(sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j])
-        sir_first[i, 7, j] = as.positive(sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j])
+        sir_first[i, 5, j] = abs(as.integer(sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]))
+        sir_first[i, 6, j] = abs(as.integer(sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j]))
+        sir_first[i, 7, j] = abs(as.integer(sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j]))
         sir_first[i, 4, j] = sir_first[i, 5, j] + sir_first[i, 6, j] + sir_first[i, 7, j]
         
       }
@@ -375,8 +361,8 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
     
     for (i in 1:C) {
       if (sir[1, 2, i] == 1) {                                          # In vaccinated clusters
-        sir[, 5, i] = as.positive(equilibrium_result[i, 5]*(1 - p_vax)) # S=S*(1-COVERAGE)
-        sir[, 6, i] = as.positive(equilibrium_result[i, 5]*p_vax)       # V=S*COVERAGE
+        sir[, 5, i] = abs(as.integer(equilibrium_result[i, 5]*(1 - p_vax))) # S=S*(1-COVERAGE)
+        sir[, 6, i] = abs(as.integer(equilibrium_result[i, 5]*p_vax))       # V=S*COVERAGE
         
       } else {                                   # In non-vax clusters
         sir[, 5, i] = equilibrium_result[i, 5]   # Susceptible are all S from simulation
@@ -395,43 +381,43 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
         sir[i, 9, j] = per_local*beta[j]*sir[i-1, 7, j]/sir[i-1, 4, j] +
           (1 - per_local)*sum(beta, na.rm = TRUE)*sum(sir[i-1, 7,], na.rm = TRUE)/sum(sir[i-1, 4,], na.rm = TRUE) 
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
-        sir[i, 11, j] = as.positive(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j]))
+        sir[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j])))
         
         # From V to I
         
         sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
-        sir[i, 13, j] = as.positive(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j]))
+        sir[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j])))
         
         # From I to R
         
         sir[i, 14, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir[i, 15, j] = as.positive(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j]))  
+        sir[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j])))
         
         # Deaths
         
         sir[i, 16, j] = (1 - exp(-death*time_step))  
-        sir[i, 17, j] = as.positive(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j])) 
-        sir[i, 18, j] = as.positive(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j])) 
-        sir[i, 19, j] = as.positive(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j])) 
-        sir[i, 20, j] = as.positive(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j])) 
+        sir[i, 17, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j])))
+        sir[i, 18, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j]))) 
+        sir[i, 19, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j])))
+        sir[i, 20, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j])))
         
         # Births
         
         sir[i, 21, j] = (1 - exp(-birth*time_step))  
-        sir[i, 22, j] = as.positive(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j])) 
+        sir[i, 22, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j])))
         
         # Model equations
         if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
           
-          sir[i, 5, j] = as.positive(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + as.positive(sir[i, 22, j]*(1-p_vax)))
-          sir[i, 6, j] = as.positive(sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + as.positive(sir[i, 22, j]*(p_vax)))
+          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + abs(as.integer(sir[i, 22, j]*(1-p_vax)))))
+          sir[i, 6, j] = abs(as.integer(sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + abs(as.integer(sir[i, 22, j]*(p_vax)))))
         
         } else {                   # In non-vaccine clusters, all births go to S
           
-          sir[i, 5, j] = as.positive(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j])
+          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j]))
         }
-        sir[i, 7, j] = as.positive(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j])
-        sir[i, 8, j] = as.positive(sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j])
+        sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]))
+        sir[i, 8, j] = abs(as.integer(sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]))
         sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
         
       }
