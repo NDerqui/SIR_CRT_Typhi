@@ -225,7 +225,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   
   # Calculated parameters
   
-  R0 <- rnorm(n = C, mean = R0, var = 0.1*R0) # Varying R0
+  R0 <- rnorm(n = C, mean = R0, var = 0.1*R0)# Varying R0
   beta <- R0/dur_inf                         # Transmission rate
   mu <- p_sym*p_test*p_positive              # Prob of detecting I
   
