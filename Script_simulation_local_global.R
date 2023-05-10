@@ -84,7 +84,7 @@ p_positive <- 0.60  # Probability of test being positive
 
 N <- 200000               # Total population in the study
 C <- 100                  # Number of clusters
-var <- 0.01                # Variability in cluster populations: 1% or 20%
+var <- 0.01               # Variability in cluster populations: 1% or 20%
 
 random_cluster <- 1
 
@@ -96,13 +96,13 @@ random_cluster <- 1
 # FUNCTIONS -------------------------------------------------------------
 
 
-main <- function(N, C, var, random_cluster = 1,  # Population and cluster characteristics
-                   incidence, birth, death,       # Incidence, birth and death rate
-                   R0, dur_inf, per_local,        # Infection parameters & % of local trans
-                   p_vax, p_clusvax, vax_eff,     # Vaccination parameters
-                   p_sym, p_test, p_positive,     # Observed infections
-                   time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
-                   n_runs) {   
+main <- function(N, C, var, random_cluster = 1, # Population and cluster characteristics
+                 incidence, birth, death,       # Incidence, birth and death rate
+                 R0, dur_inf, per_local,        # Infection parameters & % of local trans
+                 p_vax, p_clusvax, vax_eff,     # Vaccination parameters
+                 p_sym, p_test, p_positive,     # Observed infections
+                 time_step = 1, years1, years2, # Time: equilibrium sim y, vaccine sim y
+                 n_runs) {   
   
   
   ## Cluster data
