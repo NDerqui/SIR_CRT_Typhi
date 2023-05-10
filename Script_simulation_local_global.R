@@ -84,7 +84,7 @@ p_positive <- 0.60  # Probability of test being positive
 
 N <- 200000               # Total population in the study
 C <- 100                  # Number of clusters
-sd <- 0.01                # Variance in cluster populations: as factor (0.01 // 0.2)
+var <- 0.01                # Variability in cluster populations: 1% or 20%
 
 random_cluster <- 1
 
@@ -96,7 +96,7 @@ random_cluster <- 1
 # FUNCTIONS -------------------------------------------------------------
 
 
-main <- function(N, C, sd, random_cluster = 1,  # Population and cluster characteristics
+main <- function(N, C, var, random_cluster = 1,  # Population and cluster characteristics
                    incidence, birth, death,       # Incidence, birth and death rate
                    R0, dur_inf, per_local,        # Infection parameters & % of local trans
                    p_vax, p_clusvax, vax_eff,     # Vaccination parameters
@@ -113,7 +113,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Population in each cluster vector
   
-  n <- as.integer(rnorm(n = C, mean = N/C, sd = sd*N/C))
+  n <- as.integer(rnorm(n = C, mean = N/C, var = var*N/C))
   cluster_n <- abs(n)
   
   # Cluster (and vaccine allocation) distribution
@@ -225,7 +225,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   # Calculated parameters
   
-  R0 <- rnorm(n = C, mean = R0, sd = 0.1*R0) # Varying R0
+  R0 <- rnorm(n = C, mean = R0, var = 0.1*R0) # Varying R0
   beta <- R0/dur_inf                         # Transmission rate
   mu <- p_sym*p_test*p_positive              # Prob of detecting I
   
@@ -1001,7 +1001,7 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
   
   ## Returned objects
   
-  name_simulation <- paste0("C=", C, " sd=", sd, " PerLocal=", per_local, " N=", N,
+  name_simulation <- paste0("C=", C, " var=", var, " PerLocal=", per_local, " N=", N,
                             " VE=", vax_eff, " Cover=", p_vax, " VaxArm=", p_clusvax)
   
   other_characteristics <- paste0("Incidence=", incidence, " BirthRate=", birth, " DeathRate=", death,
@@ -1042,14 +1042,14 @@ main <- function(N, C, sd, random_cluster = 1,  # Population and cluster charact
 
 N
 C
-sd
+var
 vax_eff
 p_vax
 p_clusvax
 
 # Run
 
-run <- main(N = 200000, C = 10, sd = 0.2,
+run <- main(N = 200000, C = 10, var = 0.2,
             incidence = incidence, birth = birth, death = death,
             R0 = R0, dur_inf = dur_inf, per_local = 0.5,
             p_vax = 0.5, p_clusvax = p_clusvax, vax_eff = 0.8,
@@ -1115,16 +1115,16 @@ saveRDS(run[[13]], file = paste0("Results/", Sys.Date(), "/", name,"/All_data_re
 # R0 general analyses to be continued with 1.7, 1.5, 1.2
 
 pop_list <- c(200000, 100000, 50000, 20000, 10000)
-sd_list <- c(0.01, 0.2)
+var_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
 
 for (i in 1:length(pop_list)) {
   
-  for (j in 1:length(sd_list)) {
+  for (j in 1:length(var_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = pop_list[i], C = 80, sd = sd_list[j],
+      run <- main(N = pop_list[i], C = 80, var = var_list[j],
                   incidence = incidence, birth = birth, death = death,
                   R0 = 2, dur_inf = dur_inf, per_local = 0.5,
                   p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
@@ -1187,16 +1187,16 @@ for (i in 1:length(pop_list)) {
 # First, explore R0 with N = 72,000 (70 clusters)
 
 r0_list <- c(0.2, 0.3, 0.4, 0.5, 0.7, 1, 1.2, 1.5, 2)
-sd_list <- c(0.01, 0.2)
+var_list <- c(0.01, 0.2)
 cover_list <- c(0.5, 0.7, 0.9)
 
 for (i in 1:length(r0_list)) {
   
-  for (j in 1:length(sd_list)) {
+  for (j in 1:length(var_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = 72000, C = 100, sd = sd_list[j],
+      run <- main(N = 72000, C = 100, var = var_list[j],
                   incidence = incidence, birth = birth, death = death,
                   R0 = r0_list[i], dur_inf = dur_inf, per_local = 0.5,
                   p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
@@ -1256,16 +1256,16 @@ for (i in 1:length(r0_list)) {
 # Then, explore C with N = 72,000 with R0 = 0.2
 
 cluster_list <- c(36, 52, 68, 84, 120)
-sd_list <- c(0.01, 0.2)
+var_list <- c(0.01, 0.2)
 cover_list <- c(0.7, 0.75, 0.80, 0.85)
 
 for (i in 1:length(cluster_list)) {
   
-  for (j in 1:length(sd_list)) {
+  for (j in 1:length(var_list)) {
     
     for (k in 1:length(cover_list)) {
       
-      run <- main(N = 72000, C = cluster_list[i], sd = sd_list[j],
+      run <- main(N = 72000, C = cluster_list[i], var = var_list[j],
                   incidence = incidence, birth = birth, death = death,
                   R0 = 0.2, dur_inf = dur_inf, per_local = 0.5,
                   p_vax = cover_list[k], p_clusvax = p_clusvax, vax_eff = 0.7,
