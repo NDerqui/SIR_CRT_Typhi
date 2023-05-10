@@ -113,7 +113,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   
   # Population in each cluster vector
   
-  n <- as.integer(rnorm(n = C, mean = N/C, var = var*N/C))
+  n <- as.integer(rnorm(n = C, mean = N/C, sd = var*N/C))
   cluster_n <- abs(n)
   
   # Cluster (and vaccine allocation) distribution
