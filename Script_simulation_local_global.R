@@ -283,7 +283,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         # Hazard of infection
         
-        sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6,])/sum(sir_first[i-1, 4,]))
+        sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6, -j])/sum(sir_first[i-1, 4, -j]))
         
         # From S to event (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf)*time_step)))
         
@@ -393,7 +393,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         # From S to I
         
-        sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7,])/sum(sir[i-1, 4,])) 
+        sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7, -j])/sum(sir[i-1, 4, -j])) 
         sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
         sir[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j])))
         
