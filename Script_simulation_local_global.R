@@ -259,7 +259,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     names_matrix1 <- paste0("cluster_", cluster_no)
     
-    sir_first <- array(0, dim = c(length(time_seq1), 16, C),
+    sir_first <- array(NA, dim = c(length(time_seq1), 16, C),
                        dimnames = list(names_row1, names_column1, names_matrix1))
     
     # Assign initial values
@@ -269,10 +269,10 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     for (i in 1:C) {
       sir_first[, 1, i] = cluster_no[i]
       sir_first[, 2, i] = cluster_vstatus[i]
-      sir_first[, 4, i] = cluster_n[i]
-      sir_first[, 6, i] = abs(as.integer(incidence*sir_first[, 4, i]*dur_inf))   # Initial I depends on incidence rate x duration infectiousness
-      sir_first[, 5, i] = sir_first[, 4 ,i]-sir_first[, 6, i]                    # Initial S depends on N - I
-      sir_first[, 7, i] = 0
+      sir_first[1, 4, i] = cluster_n[i]
+      sir_first[1, 6, i] = abs(as.integer(incidence*sir_first[1, 4, i]*dur_inf))# Initial I depends on incidence rate x duration infectiousness
+      sir_first[1, 5, i] = sir_first[1, 4 ,i] - sir_first[1, 6, i]              # Initial S depends on N - I
+      sir_first[1, 7, i] = 0
     }
     
     # Put the model to run
@@ -359,7 +359,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     names_matrix2 <- paste0("cluster_", cluster_no)
     
-    sir <- array(0, dim = c(length(time_seq2), 22, C),
+    sir <- array(NA, dim = c(length(time_seq2), 22, C),
                  dimnames = list(names_row2, names_column2, names_matrix2))
     
     # Assign initial values
@@ -369,19 +369,19 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     for (i in 1:C) {
       sir[, 1, i] = cluster_no[i]
       sir[, 2, i] = cluster_vstatus[i]
-      sir[, 4, i] = equilibrium_result[i, 4] # Total N from simulation
-      sir[, 7, i] = equilibrium_result[i, 6] # I from the simulation
-      sir[, 8, i] = equilibrium_result[i, 7] # R from the simulation
+      sir[1, 4, i] = equilibrium_result[i, 4] # Total N from simulation
+      sir[1, 7, i] = equilibrium_result[i, 6] # I from the simulation
+      sir[1, 8, i] = equilibrium_result[i, 7] # R from the simulation
     }
     
     for (i in 1:C) {
       if (sir[1, 2, i] == 1) {                                                                   # In vaccinated clusters
-        sir[, 5, i] = equilibrium_result[i, 5] - abs(as.integer(equilibrium_result[i, 5]*p_vax)) # S=S*(1-COVERAGE)
-        sir[, 6, i] = abs(as.integer(equilibrium_result[i, 5]*p_vax))                            # V=S*COVERAGE
+        sir[1, 5, i] = equilibrium_result[i, 5] - abs(as.integer(equilibrium_result[i, 5]*p_vax)) # S=S*(1-COVERAGE)
+        sir[1, 6, i] = abs(as.integer(equilibrium_result[i, 5]*p_vax))                            # V=S*COVERAGE
         
       } else {                                   # In non-vax clusters
-        sir[, 5, i] = equilibrium_result[i, 5]   # Susceptible are all S from simulation
-        sir[, 6, i] = as.integer(0)              # None vaccinated
+        sir[1, 5, i] = equilibrium_result[i, 5]   # Susceptible are all S from simulation
+        sir[1, 6, i] = as.integer(0)              # None vaccinated
       }
     }
     
