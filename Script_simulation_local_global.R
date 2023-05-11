@@ -253,14 +253,13 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     names_column1 <- c("cluster", "vax_status", "time_seq", 
                        "no_N", "no_S", "no_I", "no_R",
-                       "haz_inf","prob_infec", "inc_SI",
-                       "prob_recov", "inc_IR",
-                       "prob_death", "inc_SD", "inc_ID", "inc_RD",
-                       "prob_birth", "inc_NB")
+                       "hazard_inf", "inc_S_event", "inc_SI", "inc_SD",
+                       "inc_I_event2", "inc_IR", "inc_ID",
+                       "inc_RD", "inc_NB")
     
     names_matrix1 <- paste0("cluster_", cluster_no)
     
-    sir_first <- array(0, dim = c(length(time_seq1), 18, C),
+    sir_first <- array(0, dim = c(length(time_seq1), 16, C),
                        dimnames = list(names_row1, names_column1, names_matrix1))
     
     # Assign initial values
@@ -282,33 +281,50 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
       
       for (j in 1:C) {
         
-        # From S to I
+        # Hazard of infection
         
         sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6,])/sum(sir_first[i-1, 4,]))
-        sir_first[i, 9, j] = (1 - exp(-sir_first[i, 8, j]*time_step))
-        sir_first[i, 10, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 9, j])))
         
-        # From I to R
+        # From S to event (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf)*time_step)))
         
-        sir_first[i, 11, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir_first[i, 12, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 11, j]))) 
+        sir_first[i, 9, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = (1 - exp(-(sir_first[i, 8, j] + death)*time_step)))))
         
-        # Deaths
+        # From event to I (prob is hazard_I/hazard_I+hazard_death)
         
-        sir_first[i, 13, j] = (1 - exp(-death*time_step))  
-        sir_first[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 5, j], prob = sir_first[i, 13, j])))
-        sir_first[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = sir_first[i, 13, j])))
-        sir_first[i, 16, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = sir_first[i, 13, j])))
+        sir_first[i, 10, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i, 9, j], prob = sir_first[i, 8, j]/(sir_first[i, 8, j] + death))))
         
-        # Births
+        # From event to D (prob is hazard_death/hazard_I+hazard_death)
         
-        sir_first[i, 17, j] = (1 - exp(-birth*time_step))  
-        sir_first[i, 18, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = sir_first[i, 17, j]))) 
+        sir_first[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i, 9, j], prob = death/(sir_first[i, 8, j] + death))))
+        
+        # From I to event2 (R or death, allow competing hazards) (Prob of recov: (1 - exp(-(1/dur_inf)*time_step)))
+        
+        sir_first[i, 12, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 6, j], prob = (1 - exp(-((1/dur_inf) + death)*time_step)))))
+        
+        # From event2 to R (prob is hazard_R/hazard_R+hazard_death)
+        
+        sir_first[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i, 12, j], prob = (1/dur_inf)/((1/dur_inf) + death))))
+        
+        # From event2 to D (prob is hazard_death/hazard_R+hazard_death)
+        
+        sir_first[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i, 12, j], prob = death/((1/dur_inf) + death))))
+        
+        # Deaths from R (Prob of death the same across: (1 - exp(-death*time_step)))
+        
+        sir_first[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 7, j], prob = (1 - exp(-death*time_step)))))
+        
+        # Births from N (Prob of birth the same across: (1 - exp(-birth*time_step)))
+        
+        sir_first[i, 16, j] = abs(as.integer(rbinom(n = 1, size = sir_first[i-1, 4, j], prob = (1 - exp(-birth*time_step))))) 
         
         # Model equations
-        sir_first[i, 5, j] = abs(as.integer(sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 14, j] + sir_first[i, 18, j]))
-        sir_first[i, 6, j] = abs(as.integer(sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 12, j] - sir_first[i, 15, j]))
-        sir_first[i, 7, j] = abs(as.integer(sir_first[i-1, 7, j] + sir_first[i, 12, j] - sir_first[i, 16, j]))
+        
+        sir_first[i, 5, j] = abs(as.integer(sir_first[i-1, 5, j] - sir_first[i, 10, j] - sir_first[i, 11, j] + sir_first[i, 16, j]))
+        
+        sir_first[i, 6, j] = abs(as.integer(sir_first[i-1, 6, j] + sir_first[i, 10, j] - sir_first[i, 13, j] - sir_first[i, 14, j]))
+        
+        sir_first[i, 7, j] = abs(as.integer(sir_first[i-1, 7, j] + sir_first[i, 13, j] - sir_first[i, 15, j]))
+        
         sir_first[i, 4, j] = sir_first[i, 5, j] + sir_first[i, 6, j] + sir_first[i, 7, j]
         
       }
@@ -316,7 +332,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     #  Store the results: input the last row for the vaccine simulation
     
-    equilibrium_result <- as.data.frame(matrix(0, nrow = C, ncol = 18))
+    equilibrium_result <- as.data.frame(matrix(0, nrow = C, ncol = 16))
     colnames(equilibrium_result) <- names_column1
     for (i in 1:C) {
       equilibrium_result[i, ] <- sir_first[length(time_seq1), , i]         
