@@ -355,14 +355,14 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     names_column2 <- c("cluster", "vaccine", "time_seq",
                        "no_N", "no_S", "no_V", "no_I", "no_R",
-                       "haz_inf", "prob_infec", "inc_SI", "prob_vaxin", "inc_VI",
-                       "prob_recov", "inc_IR",
-                       "prob_death", "inc_SD", "inc_VD", "inc_ID", "inc_RD",
-                       "prob_birth", "inc_NB")
+                       "haz_inf", "inc_S_event", "inc_SI", "inc_SD",
+                       "inc_V_event2", "inc_VI", "inc_VD",
+                       "inc_I_event3", "inc_IR", "inc_ID",
+                       "inc_RD", "inc_NB")
     
     names_matrix2 <- paste0("cluster_", cluster_no)
     
-    sir <- array(NA, dim = c(length(time_seq2), 22, C),
+    sir <- array(NA, dim = c(length(time_seq2), 20, C),
                  dimnames = list(names_row2, names_column2, names_matrix2))
     
     # Assign initial values
@@ -394,47 +394,72 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
       
       for (j in 1:C) {
         
-        # From S to I
+        # Hazard of infection
         
         sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7, -j])/sum(sir[i-1, 4, -j])) 
-        sir[i, 10, j] = (1 - exp(-sir[i, 9, j]*time_step))
-        sir[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 10, j])))
         
-        # From V to I
+        # From S to event (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf)*time_step)))
         
-        sir[i, 12, j] = (1 - exp(-sir[i, 9, j]*(1 - vax_eff)*time_step))
-        sir[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 12, j])))
+        sir[i, 10, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = (1 - exp(-(sir[i, 9, j] + death)*time_step)))))
         
-        # From I to R
+        # From event to I (prob is hazard_I/hazard_I+hazard_death)
         
-        sir[i, 14, j] = (1 - exp(-(1/dur_inf)*time_step))  
-        sir[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 14, j])))
+        sir[i, 11, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 10, j], prob = sir[i, 9, j]/(sir[i, 9, j] + death))))
         
-        # Deaths
+        # From event to D (prob is hazard_death/hazard_I+hazard_death)
         
-        sir[i, 16, j] = (1 - exp(-death*time_step))  
-        sir[i, 17, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 5, j], prob = sir[i, 16, j])))
-        sir[i, 18, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = sir[i, 16, j]))) 
-        sir[i, 19, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 7, j], prob = sir[i, 16, j])))
-        sir[i, 20, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 8, j], prob = sir[i, 16, j])))
+        sir[i, 12, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 10, j], prob = death/(sir[i, 9, j] + death))))
         
-        # Births
+        # From V to event2 (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf*(1 - vax_eff))*time_step)))
         
-        sir[i, 21, j] = (1 - exp(-birth*time_step))  
-        sir[i, 22, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 4, j], prob = sir[i, 21, j])))
+        sir[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = (1 - exp(-(sir[i, 9, j]*(1 - vax_eff) + death)*time_step)))))
+        
+        # From event to I (prob is hazard_I*(1 - vax_eff)/hazard_I*(1 - vax_eff)+hazard_death)
+        
+        sir[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = sir[i, 9, j]*(1 - vax_eff)/(sir[i, 9, j]*(1 - vax_eff) + death))))
+        
+        # From event to D (prob is hazard_death/hazard_I*(1 - vax_eff)+hazard_death)
+        
+        sir[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = death/(sir[i, 9, j]*(1 - vax_eff) + death))))
+        
+        # From I to event3 (R or death, allow competing hazards) (Prob of recov: (1 - exp(-(1/dur_inf)*time_step)))
+        
+        sir[i, 16, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 7, j], prob = (1 - exp(-((1/dur_inf) + death)*time_step)))))
+        
+        # From event2 to R (prob is hazard_R/hazard_R+hazard_death)
+        
+        sir[i, 17, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 16, j], prob = (1/dur_inf)/((1/dur_inf) + death))))
+        
+        # From event2 to D (prob is hazard_death/hazard_R+hazard_death)
+        
+        sir[i, 18, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 16, j], prob = death/((1/dur_inf) + death))))
+        
+        # Deaths from R (Prob of death the same across: (1 - exp(-death*time_step)))
+        
+        sir[i, 19, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 8, j], prob = (1 - exp(-death*time_step)))))
+        
+        # Births from N (Prob of birth the same across: (1 - exp(-birth*time_step)))
+        
+        sir[i, 20, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 4, j], prob = (1 - exp(-birth*time_step))))) 
         
         # Model equations
         if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
           
-          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + abs(as.integer(sir[i, 22, j]*(1-p_vax)))))
-          sir[i, 6, j] = abs(as.integer(sir[i-1, 6, j] - sir[i, 13, j] - sir[i, 18, j] + abs(as.integer(sir[i, 22, j]*(p_vax)))))
+          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 12, j] + abs(as.integer(sir[i, 20, j]*(1-p_vax)))))
+          
+          sir[i, 6, j] = abs(as.integer(sir[i-1, 6, j] - sir[i, 14, j] - sir[i, 15, j] + (sir[i, 20, j] - abs(as.integer(sir[i, 20, j]*(1-p_vax))))))
         
         } else {                   # In non-vaccine clusters, all births go to S
           
-          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 17, j] + sir[i, 22, j]))
+          sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 12, j] + sir[i, 20, j]))
+          
+          sir[i, 6, j] = sir[i-1, 6, j]
         }
-        sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 13, j] - sir[i, 15, j] - sir[i, 19, j]))
-        sir[i, 8, j] = abs(as.integer(sir[i-1, 8, j] + sir[i, 15, j] - sir[i, 20, j]))
+        
+        sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 14, j] - sir[i, 17, j] - sir[i, 18, j]))
+        
+        sir[i, 8, j] = abs(as.integer(sir[i-1, 8, j] + sir[i, 17, j] - sir[i, 19, j]))
+        
         sir[i, 4, j] = sir[i, 5, j] + sir[i, 6, j] + sir[i, 7, j] + sir[i, 8, j]
         
       }
