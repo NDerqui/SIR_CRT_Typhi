@@ -18,14 +18,13 @@
 rm(list = ls())
 
 library(tidyverse)
-library(gee)
-library(pubh)
+library(miceadds)
+library(sandwich)
 library(forcats)
 library(DescTools)
 library(svMisc)
 library(wesanderson)
 library(ggpubr)
-
 
 
 
@@ -657,30 +656,25 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   
   # Output vector to store the results of the test
   
-  output_direct <- matrix(0, ncol = 4, nrow = n_runs)
+  output_direct <- matrix(0, ncol = 3, nrow = n_runs)
   
   for (i in 1:n_runs) {
     
-    model <- gee(formula = as.formula((incidence/total) ~ vax_incluster),
-                 id = cluster, data = filter(sir_direct, run == i),
+    model <- glm.cluster(formula = as.formula((incidence/total) ~ vax_incluster),
+                 cluster = "cluster", data = filter(sir_direct, run == i),
                  family = "poisson"(link = "log"))
-    
-    # Do the robust standard errors
-    
-    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
     
     # Store them
     
-    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
-    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
-    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
-    output_direct[i, 4]   <- robust[2, 3]
+    output_direct[i, 1]   <- exp(coef(model))[2]
+    output_direct[i, 2]   <- exp(confint(model))[2]
+    output_direct[i, 3]   <- exp(confint(model))[4]
   }
   
   # Clean the result vector
   
   rownames(output_direct) <- paste0("run_", seq(1:n_runs))
-  colnames(output_direct) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
+  colnames(output_direct) <- c("Exp(Coeff)", "95% CI", "95%CI")
   
 
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
@@ -691,30 +685,25 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
   # Output vector to store the results of the test
     
-  output_indirect <- matrix(0, ncol = 4, nrow = n_runs)
+  output_indirect <- matrix(0, ncol = 3, nrow = n_runs)
     
   for (i in 1:n_runs) {
       
-    model <- gee(formula = as.formula((sum_SI/sus_risk) ~ vaccine),
-                 id = cluster, data = filter(sir_direct, run == i),
+    model <- glm.cluster(formula = as.formula((sum_SI/sus_risk) ~ vaccine),
+                 cluster = "cluster", data = filter(sir_indirect, run == i),
                  family = "poisson"(link = "log"))
       
-    # Do the robust standard errors
-    
-    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
-    
     # Store them
     
-    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
-    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
-    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
-    output_direct[i, 4]   <- robust[2, 3]
+    output_direct[i, 1]   <- exp(coef(model))[2]
+    output_direct[i, 2]   <- exp(confint(model))[2]
+    output_direct[i, 3]   <- exp(confint(model))[4]
   }
     
   # Clean the result vector
     
   rownames(output_indirect) <- paste0("run_", seq(1:n_runs))
-  colnames(output_indirect) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
+  colnames(output_indirect) <- c("Exp(Coeff)", "95% CI", "95%CI")
 
   
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
@@ -734,30 +723,25 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
   # Output vector to store the results of the test
     
-  output_total <- matrix(0, ncol = 4, nrow = n_runs)
+  output_total <- matrix(0, ncol = 3, nrow = n_runs)
     
   for (i in 1:n_runs) {
       
-    model <- gee(formula = as.formula((incidence/total) ~ vaccine),
-                 id = cluster, data = filter(sir_direct, run == i),
+    model <- glm.cluster(formula = as.formula((incidence/total) ~ vaccine),
+                 cluster = "cluster", data = filter(sir_total, run == i),
                  family = "poisson"(link = "log"))
       
-    # Do the robust standard errors
-    
-    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
-    
     # Store them
     
-    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
-    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
-    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
-    output_direct[i, 4]   <- robust[2, 3]
+    output_direct[i, 1]   <- exp(coef(model))[2]
+    output_direct[i, 2]   <- exp(confint(model))[2]
+    output_direct[i, 3]   <- exp(confint(model))[4]
   }
     
   # Clean the result vector
     
   rownames(output_total) <- paste0("run_", seq(1:n_runs))
-  colnames(output_total) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
+  colnames(output_total) <- c("Exp(Coeff)", "95% CI", "95%CI")
      
   
  # Overall effect: all in vaccine cluster vs all in non-vaccine
@@ -772,30 +756,25 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
   # Output vector to store the results of the test
     
-  output_overall <- matrix(0, ncol = 4, nrow = n_runs)
+  output_overall <- matrix(0, ncol = 3, nrow = n_runs)
     
     for (i in 1:n_runs) {
       
-      model <- gee(formula = as.formula((sum_all_inc/total) ~ vaccine),
-                   id = cluster, data = filter(sir_direct, run == i),
+      model <- glm.cluster(formula = as.formula((sum_all_inc/total) ~ vaccine),
+                   cluster = "cluster", data = filter(sir_overall, run == i),
                    family = "poisson"(link = "log"))
-      
-      # Do the robust standard errors
-      
-      robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
       
       # Store them
       
-      output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
-      output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
-      output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
-      output_direct[i, 4]   <- robust[2, 3]
+      output_direct[i, 1]   <- exp(coef(model))[2]
+      output_direct[i, 2]   <- exp(confint(model))[2]
+      output_direct[i, 3]   <- exp(confint(model))[4]
    }
     
   # Clean the result vector
     
   rownames(output_overall) <- paste0("run_", seq(1:n_runs))
-  colnames(output_overall) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
+  colnames(output_overall) <- c("Exp(Coeff)", "95% CI", "95%CI")
     
 
   # Summary of all effects
@@ -885,8 +864,6 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   list <- list(name_simulation = name_simulation,
                other_characteristics = other_characteristics,
                cluster_pop = cluster_n,
-               incidence_plot = incidence_plot,
-               summary_infections = summary,
                output_direct = output_direct,
                output_indirect = output_indirect,
                output_overall = output_overall,
