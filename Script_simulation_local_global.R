@@ -18,8 +18,8 @@
 rm(list = ls())
 
 library(tidyverse)
-library(sandwich)
-library(lmtest)
+library(gee)
+library(pubh)
 library(forcats)
 library(DescTools)
 library(svMisc)
@@ -344,7 +344,6 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     ## Step 2: vaccine introduction
     
-    
     # Total time
     
     time_seq2 <- seq(from = 1, to = 365*years2, by = time_step)
@@ -592,7 +591,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     ungroup() %>%
     # Aim: : estimate incidence per person-year
     # Calculate sum of all susceptible (or vaccinated) in year
-    group_by(run, vaccine) %>%
+    group_by(run, cluster) %>%
     mutate(sus_risk = susceptible) %>%
     mutate(vax_risk = vaccinated) %>%
     mutate(sus_risk = sum(sus_risk, na.rm = TRUE)*time_step/365) %>%
@@ -607,8 +606,8 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     mutate(sum_all_inc = rbinom(n = 1, size = sum_all_inc, prob = mu)) %>%
     # Only one obs per run and cluster
     filter(row_number() == 1) %>%
-    select(-time_seq, -cluster, -eliminate, -susceptible, -vaccinated,
-           -infected, -observed, -inc_sus_inf, -inc_vax_inf) %>%
+    select(-time_seq, -eliminate, -susceptible, -vaccinated,
+           -infected, -inc_sus_inf, -inc_vax_inf) %>%
     ungroup()
   
   ## Calculating ICC and DesignEffect
@@ -643,9 +642,9 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   sir_direct <- for_poisson %>%
     # Only measured in vaccine clusters
     filter(vaccine == 1) %>%
-    select(run, vaccine, sus_risk, vax_risk, sum_SI, sum_VI) %>%
+    select(run, cluster, sus_risk, vax_risk, sum_SI, sum_VI) %>%
     # Pivot to get the incidence SI vs VI only
-    pivot_longer(-c(run, vaccine, sus_risk, vax_risk),
+    pivot_longer(-c(run, cluster, sus_risk, vax_risk),
                  names_to = "vax_incluster", values_to = "incidence") %>%
     # Change names
     mutate(vax_incluster = case_when(vax_incluster == "sum_VI" ~ 1,
@@ -654,87 +653,75 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     mutate(total = case_when(vax_incluster == 1 ~ vax_risk,
                              vax_incluster == 0 ~ sus_risk)) %>%
     # Clean
-    select(run, vax_incluster, incidence, total)
+    select(run, cluster, vax_incluster, incidence, total)
   
   # Output vector to store the results of the test
   
-  output_direct <- matrix(0, ncol = 6, nrow = n_runs)
+  output_direct <- matrix(0, ncol = 4, nrow = n_runs)
   
   for (i in 1:n_runs) {
     
-    model <- glm(formula = as.formula((incidence/total) ~ vax_incluster),
-                 family = "poisson"(link = "log"),
-                 data = filter(sir_direct, run == i))
+    model <- gee(formula = as.formula((incidence/total) ~ vax_incluster),
+                 id = cluster, data = filter(sir_direct, run == i),
+                 family = "poisson"(link = "log"))
     
     # Do the robust standard errors
     
-    robust <- coeftest(model, vcov. = sandwich)
-    
-    # Get the coefficients of the model
-    
-    x <- exp(robust[2, 1])
-    y <- robust[2, 2:4]
-    z <- exp(confint(robust))
+    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
     
     # Store them
     
-    output_direct[i, 1]   <- x
-    output_direct[i, 2:4] <- y
-    output_direct[i, 5:6] <- z[2,]
+    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
+    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
+    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
+    output_direct[i, 4]   <- robust[2, 3]
   }
   
   # Clean the result vector
   
   rownames(output_direct) <- paste0("run_", seq(1:n_runs))
-  colnames(output_direct) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                              "2.5%", "97.5%")
+  colnames(output_direct) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
   
 
   # Indirect effect: unvax in vaccine clusters vs non-vaccine clusters
     
   sir_indirect <- for_poisson %>%
     # Focus therefore only on incidence S to I
-    select(run, vaccine, sum_SI, sus_risk)
+    select(run, cluster, vaccine, sum_SI, sus_risk)
     
   # Output vector to store the results of the test
     
-  output_indirect <- matrix(0, ncol = 6, nrow = n_runs)
+  output_indirect <- matrix(0, ncol = 4, nrow = n_runs)
     
   for (i in 1:n_runs) {
       
-  model <- glm(formula = as.formula((sum_SI/sus_risk) ~ vaccine),
-               family = "poisson"(link = "log"),
-               data = filter(sir_indirect, run == i))
+    model <- gee(formula = as.formula((sum_SI/sus_risk) ~ vaccine),
+                 id = cluster, data = filter(sir_direct, run == i),
+                 family = "poisson"(link = "log"))
       
     # Do the robust standard errors
-      
-    robust <- robust <- coeftest(model, vcov. = sandwich)
-      
-    # Get the coefficients of the model
-      
-    x <- exp(robust[2, 1])
-    y <- robust[2, 2:4]
-    z <- exp(confint(robust))
-      
+    
+    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
+    
     # Store them
-      
-    output_indirect[i, 1]   <- x
-    output_indirect[i, 2:4] <- y
-    output_indirect[i, 5:6] <- z[2,]
+    
+    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
+    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
+    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
+    output_direct[i, 4]   <- robust[2, 3]
   }
     
   # Clean the result vector
     
   rownames(output_indirect) <- paste0("run_", seq(1:n_runs))
-  colnames(output_indirect) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                          "2.5%", "97.5%")
+  colnames(output_indirect) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
 
   
   # Total effect: vax in vaccine cluster vs unvax in non-vaccine
     
   sir_total <- for_poisson %>%
     # Select
-    select(run, vaccine, sus_risk, vax_risk, sum_VI, sum_all_inc) %>%
+    select(run, cluster, vaccine, sus_risk, vax_risk, sum_VI, sum_all_inc) %>%
     # Get one var with VI only from vaccine clusters,
     # and all incidence from non-vaccine
     mutate(incidence = case_when(vaccine == 1 ~ sum_VI,
@@ -743,84 +730,72 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     mutate(total = case_when(vaccine == 1 ~ vax_risk,
                              vaccine == 0 ~ sus_risk)) %>%
     # Clean
-    select(run, vaccine, incidence, total)
+    select(run, cluster, vaccine, incidence, total)
     
   # Output vector to store the results of the test
     
-  output_total <- matrix(0, ncol = 6, nrow = n_runs)
+  output_total <- matrix(0, ncol = 4, nrow = n_runs)
     
   for (i in 1:n_runs) {
       
-    model <- glm(formula = as.formula((incidence/total) ~ vaccine),
-                 family = "poisson"(link = "log"),
-                 data = filter(sir_total, run == i))
+    model <- gee(formula = as.formula((incidence/total) ~ vaccine),
+                 id = cluster, data = filter(sir_direct, run == i),
+                 family = "poisson"(link = "log"))
       
     # Do the robust standard errors
-      
-    robust <- robust <- coeftest(model, vcov. = sandwich)
-      
-    # Get the coefficients of the model
-      
-    x <- exp(robust[2, 1])
-    y <- robust[2, 2:4]
-    z <- exp(confint(robust))
-      
+    
+    robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
+    
     # Store them
-      
-    output_total[i, 1]   <- x
-    output_total[i, 2:4] <- y
-    output_total[i, 5:6] <- z[2,]
+    
+    output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
+    output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
+    output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
+    output_direct[i, 4]   <- robust[2, 3]
   }
     
   # Clean the result vector
     
   rownames(output_total) <- paste0("run_", seq(1:n_runs))
-  colnames(output_total) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                                "2.5%", "97.5%")
+  colnames(output_total) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
      
   
  # Overall effect: all in vaccine cluster vs all in non-vaccine
     
  sir_overall <- for_poisson %>%
    # We are interested in overall incidence
-   select(run, vaccine, sus_risk, vax_risk, sum_all_inc) %>%
+   select(run, cluster, vaccine, sus_risk, vax_risk, sum_all_inc) %>%
    # Get total
    mutate(total = sus_risk + vax_risk) %>%
    # Clean
-   select(run, vaccine, sum_all_inc, total)
+   select(run, cluster, vaccine, sum_all_inc, total)
     
   # Output vector to store the results of the test
     
-  output_overall <- matrix(0, ncol = 6, nrow = n_runs)
+  output_overall <- matrix(0, ncol = 4, nrow = n_runs)
     
     for (i in 1:n_runs) {
       
-      model <- glm(formula = as.formula((sum_all_inc/total) ~ vaccine),
-                   family = "poisson"(link = "log"), 
-                   data = filter(sir_overall, run == i))
+      model <- gee(formula = as.formula((sum_all_inc/total) ~ vaccine),
+                   id = cluster, data = filter(sir_direct, run == i),
+                   family = "poisson"(link = "log"))
       
       # Do the robust standard errors
       
-      robust <- robust <- coeftest(model, vcov. = sandwich)
-      
-      # Get the coefficients of the model
-      
-      x <- exp(robust[2, 1])
-      y <- robust[2, 2:4]
-      z <- exp(confint(robust))
+      robust <- glm_coef(model, alpha = 0.05, se_rob = TRUE)
       
       # Store them
       
-      output_overall[i, 1]   <- x
-      output_overall[i, 2:4] <- y
-      output_overall[i, 5:6] <- z[2,]
+      output_direct[i, 1]   <- as.numeric(substr(robust[2,2], 1, 4))
+      output_direct[i, 2]   <- as.numeric(substr(robust[2,2], 7, 10))
+      output_direct[i, 3]   <- as.numeric(substr(robust[2,2], 13, 16))
+      output_direct[i, 4]   <- robust[2, 3]
    }
     
   # Clean the result vector
     
   rownames(output_overall) <- paste0("run_", seq(1:n_runs))
-  colnames(output_overall) <- c("exp(Estimate)", "SE", "z Val", "Pr(>|z|)",
-                          "2.5%", "97.5%")
+  colnames(output_overall) <- c("Exp(Coeff)", "95% CI", "95%CI", "Pr(>|z|)")
     
 
   # Summary of all effects
@@ -845,25 +820,25 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   
   counts_dir <- n_runs
   for (i in 1:n_runs) {
-    if(output_direct[i,5] < 1 & output_direct[i,6] >= 1) {
+    if(output_direct[i,2] < 1 & output_direct[i,3] >= 1) {
       counts_dir <- counts_dir - 1
     }
   }
   counts_ind <- n_runs
   for (i in 1:n_runs) {
-    if(output_indirect[i,5] < 1 & output_indirect[i,6] >= 1) {
+    if(output_indirect[i,2] < 1 & output_indirect[i,3] >= 1) {
       counts_ind <- counts_ind - 1
     }
   }
   counts_tot <- n_runs
   for (i in 1:n_runs) {
-    if(output_total[i,5] < 1 & output_total[i,6] >= 1) {
+    if(output_total[i,2] < 1 & output_total[i,3] >= 1) {
       counts_tot <- counts_tot - 1
     }
   }
   counts_ove <- n_runs
   for (i in 1:n_runs) {
-    if(output_overall[i,5] < 1 & output_overall[i,6] >= 1) {
+    if(output_overall[i,2] < 1 & output_overall[i,3] >= 1) {
       counts_ove <- counts_ove - 1
     }
   }
@@ -879,24 +854,22 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   poisson_summary <- round(poisson_summary, digits = 4)
   
   
-  
   ## ICC-DE summary
   
-  other_summary <- matrix(0, nrow = 3, ncol = 4)
+  icc_summary <- matrix(0, nrow = 3, ncol = 4)
   
-  other_summary[1, 1] <- mean(icc[,4], na.rm = TRUE)
-  other_summary[1, 2] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[1]
-  other_summary[1, 3] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[2]
-  other_summary[2, 1] <- mean(icc[,5], na.rm = TRUE)
-  other_summary[2, 2] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[1]
-  other_summary[2, 3] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[2]
-  other_summary[3, 1] <- mean(R0, na.rm = TRUE)
-  other_summary[3, 2] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[1]
-  other_summary[3, 3] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  icc_summary[1, 1] <- mean(icc[,4], na.rm = TRUE)
+  icc_summary[1, 2] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  icc_summary[1, 3] <- quantile(icc[,4], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  icc_summary[2, 1] <- mean(icc[,5], na.rm = TRUE)
+  icc_summary[2, 2] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  icc_summary[2, 3] <- quantile(icc[,5], probs = c(0.025, 0.975), na.rm = TRUE)[2]
+  icc_summary[3, 1] <- mean(R0, na.rm = TRUE)
+  icc_summary[3, 2] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[1]
+  icc_summary[3, 3] <- quantile(R0, probs = c(0.025, 0.975), na.rm = TRUE)[2]
   
-  rownames(other_summary) <- c("ICC", "DEsign Effect", "R0")
-  colnames(other_summary) <- c("Mean Effect", "Lower CI from Mean", "Upper CI from Mean", "Power %")
-  
+  rownames(icc_summary) <- c("ICC", "DEsign Effect", "R0")
+  colnames(icc_summary) <- c("Mean Effect", "Lower CI from Mean", "Upper CI from Mean", "Power %")
   
   
   ## Returned objects
@@ -920,7 +893,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
                output_total = output_total,
                poisson_summary = poisson_summary,
                icc_design = icc,
-               other_summary = other_summary,
+               icc_summary = icc_summary,
                reference_data = list(cluster_map = cluster_map,
                                      cluster_data = cluster_data,
                                      equilibrium_result = equilibrium_result,
