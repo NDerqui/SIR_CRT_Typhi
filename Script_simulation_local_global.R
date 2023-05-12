@@ -286,7 +286,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         # Hazard of infection
         
-        sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6, -j])/sum(sir_first[i-1, 4, -j]))
+        sir_first[i, 8, j] = beta[j]*(per_local*sir_first[i-1, 6, j]/sir_first[i-1, 4, j] + (1 - per_local)*sum(sir_first[i-1, 6, -j], na.rm = TRUE)/sum(sir_first[i-1, 4, -j], na.rm = TRUE))
         
         # From S to event (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf)*time_step)))
         
@@ -396,7 +396,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         # Hazard of infection
         
-        sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7, -j])/sum(sir[i-1, 4, -j])) 
+        sir[i, 9, j] = beta[j]*(per_local*sir[i-1, 7, j]/sir[i-1, 4, j] + (1 - per_local)*sum(sir[i-1, 7, -j], na.rm = TRUE)/sum(sir[i-1, 4, -j], na.rm = TRUE)) 
         
         # From S to event (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf)*time_step)))
         
@@ -448,20 +448,22 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         # Model equations
         
-        if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
+        if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V, and I are updated with SI and VI
           
           sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 12, j] + abs(as.integer(sir[i, 20, j]*(1-p_vax)))))
           
           sir[i, 6, j] = abs(as.integer(sir[i-1, 6, j] - sir[i, 14, j] - sir[i, 15, j] + (sir[i, 20, j] - abs(as.integer(sir[i, 20, j]*(1-p_vax))))))
+          
+          sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 14, j] - sir[i, 17, j] - sir[i, 18, j]))
         
-        } else {                   # In non-vaccine clusters, all births go to S
+        } else {                   # In non-vaccine clusters, all births go to S, and I are only updated with SI
           
           sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 12, j] + sir[i, 20, j]))
           
           sir[i, 6, j] = sir[i-1, 6, j]
+          
+          sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] - sir[i, 17, j] - sir[i, 18, j]))
         }
-        
-        sir[i, 7, j] = abs(as.integer(sir[i-1, 7, j] + sir[i, 11, j] + sir[i, 14, j] - sir[i, 17, j] - sir[i, 18, j]))
         
         sir[i, 8, j] = abs(as.integer(sir[i-1, 8, j] + sir[i, 17, j] - sir[i, 19, j]))
         
