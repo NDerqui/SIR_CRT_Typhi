@@ -410,17 +410,21 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         
         sir[i, 12, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 10, j], prob = death/(sir[i, 9, j] + death))))
         
-        # From V to event2 (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf*(1 - vax_eff))*time_step)))
-        
-        sir[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = (1 - exp(-(sir[i, 9, j]*(1 - vax_eff) + death)*time_step)))))
-        
-        # From event to I (prob is hazard_I*(1 - vax_eff)/hazard_I*(1 - vax_eff)+hazard_death)
-        
-        sir[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = sir[i, 9, j]*(1 - vax_eff)/(sir[i, 9, j]*(1 - vax_eff) + death))))
-        
-        # From event to D (prob is hazard_death/hazard_I*(1 - vax_eff)+hazard_death)
-        
-        sir[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = death/(sir[i, 9, j]*(1 - vax_eff) + death))))
+        if (sir[i, 2, j] == 1) { # Vaccination dynamics only on vax clusters
+          
+          # From V to event2 (I or death, allow competing hazards) (Prob of I: (1 - exp(-(haz_inf*(1 - vax_eff))*time_step)))
+          
+          sir[i, 13, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 6, j], prob = (1 - exp(-(sir[i, 9, j]*(1 - vax_eff) + death)*time_step)))))
+          
+          # From event to I (prob is hazard_I*(1 - vax_eff)/hazard_I*(1 - vax_eff)+hazard_death)
+          
+          sir[i, 14, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = sir[i, 9, j]*(1 - vax_eff)/(sir[i, 9, j]*(1 - vax_eff) + death))))
+          
+          # From event to D (prob is hazard_death/hazard_I*(1 - vax_eff)+hazard_death)
+          
+          sir[i, 15, j] = abs(as.integer(rbinom(n = 1, size = sir[i, 13, j], prob = death/(sir[i, 9, j]*(1 - vax_eff) + death))))
+          
+        }
         
         # From I to event3 (R or death, allow competing hazards) (Prob of recov: (1 - exp(-(1/dur_inf)*time_step)))
         
@@ -443,6 +447,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
         sir[i, 20, j] = abs(as.integer(rbinom(n = 1, size = sir[i-1, 4, j], prob = (1 - exp(-birth*time_step))))) 
         
         # Model equations
+        
         if (sir[i, 2, j] == 1) {   # In vaccine clusters, births are divided into S and V
           
           sir[i, 5, j] = abs(as.integer(sir[i-1, 5, j] - sir[i, 11, j] - sir[i, 12, j] + abs(as.integer(sir[i, 20, j]*(1-p_vax)))))
@@ -506,7 +511,7 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_VI) <- names_matrix2
     for (i in 1:C) {
-      sir_res_inc_VI[,i] <- round(rbinom(n = 1, size = sir[,13,i], prob = mu), digits = 0)
+      sir_res_inc_VI[,i] <- round(rbinom(n = 1, size = sir[,14,i], prob = mu), digits = 0)
     }
     
     ## Pivot the results and merge all together
