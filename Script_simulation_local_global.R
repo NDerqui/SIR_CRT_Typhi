@@ -219,6 +219,9 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   colnames(cluster_data) <- c("cluster", "vaccine", "pop",
                               paste0("dis_", cluster_no))
   
+  # Clean
+  
+  rm(i, j, k, l, m, n, vertical, horizontal, distance)
   
   
   ## Considerations
@@ -563,6 +566,10 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     if (n == n_runs) {cat("Simulations done!\n")}
     
   }
+  
+  # Clean
+  
+  rm(i, j, n)
   
   sir_output <- sir_output[2:nrow(sir_output),]
   
