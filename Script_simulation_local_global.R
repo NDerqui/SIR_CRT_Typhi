@@ -474,47 +474,35 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
     
     # Store the results
     
-    ## Total S in each cluster
+    ## Total S in each cluster: each col is a cluster
     sir_res_susceptible <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_susceptible) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_susceptible[,i] <- sir[,5,i]         
-    }
+    for (i in 1:C) { sir_res_susceptible[,i] <- sir[,5,i] }
     
-    ## Total V in each cluster
+    ## Total V in each cluster: each col is a cluster
     sir_res_vaccinated <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_vaccinated) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_vaccinated[,i] <- sir[,6,i]         
-    }
+    for (i in 1:C) { sir_res_vaccinated[,i] <- sir[,6,i] }
     
-    ## Infected
+    ## Total Infected: each col is a cluster
     sir_res_infected <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_infected) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_infected[,i] <- sir[,7,i]         
-    }
+    for (i in 1:C) { sir_res_infected[,i] <- sir[,7,i] }
     
-    ## Detected infections
+    ## Detected infections: each col is a cluster
     sir_res_observed <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_observed) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_observed[,i] <- round(rbinom(n = 1, size = sir[,7,i], prob = mu), digits = 0)
-    }
+    for (i in 1:C) { sir_res_observed[,i] <- round(rbinom(n = 1, size = sir[,7,i], prob = mu), digits = 0) }
     
-    ## Detected incidence of infection from S
+    ## Detected incidence of infection from S: each col is a cluster
     sir_res_inc_SI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_SI) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_inc_SI[,i] <- round(rbinom(n = 1, size = sir[,11,i], prob = mu), digits = 0)
-    }
+    for (i in 1:C) { sir_res_inc_SI[,i] <- round(rbinom(n = 1, size = sir[,11,i], prob = mu), digits = 0) }
     
-    ## Detected incidence of infection from V
+    ## Detected incidence of infection from V: each col is a cluster
     sir_res_inc_VI <- as.data.frame(matrix(0, nrow = length(time_seq2), ncol = C))
     colnames(sir_res_inc_VI) <- names_matrix2
-    for (i in 1:C) {
-      sir_res_inc_VI[,i] <- round(rbinom(n = 1, size = sir[,14,i], prob = mu), digits = 0)
-    }
+    for (i in 1:C) { sir_res_inc_VI[,i] <- round(rbinom(n = 1, size = sir[,14,i], prob = mu), digits = 0) }
     
     ## Pivot the results and merge all together
     sir_res_susceptible <- sir_res_susceptible %>%
@@ -583,11 +571,6 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
                                "infected", "observed", "inc_sus_inf", "inc_vax_inf", "run"),
                         all = TRUE)
     
-    sir_output <- sir_output %>%
-      select("run", "cluster", "vaccine", "time_seq", "susceptible", "vaccinated",
-             "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
-      arrange(run, cluster, time_seq)
-    
     
     ## Progress
     
@@ -603,8 +586,12 @@ main <- function(N, C, var, random_cluster = 1, # Population and cluster charact
   
   rm(i, j, n)
   
-  sir_output <- sir_output[2:nrow(sir_output),]
+  sir_output <- sir_output %>%
+    select("run", "cluster", "vaccine", "time_seq", "susceptible", "vaccinated",
+           "infected", "observed", "inc_sus_inf", "inc_vax_inf") %>%
+    arrange(run, cluster, time_seq)
   
+  sir_output <- sir_output[2:nrow(sir_output),]
   
   
   ## Results from all the runs
